@@ -1,0 +1,28 @@
+# See https://help.github.com/ignore-files/ for more about ignoring files.
+
+# Dependencies
+node_modules/
+package-lock.json
+
+# Production
+build/
+
+# coverage
+coverage/
+coverageEnv/
+coverage.json
+allFiredEvents
+scTopics
+
+# Logs
+yarn-debug.log*
+yarn-error.log*
+
+# Editors
+.vscode/
+.idea/*
+
+# Misc
+.DS_Store
+
+bytecode
