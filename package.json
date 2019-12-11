@@ -13,11 +13,10 @@
     "ganache-cli:test": "./node_modules/@aragon/test-helpers/ganache-cli.sh"
   },
   "dependencies": {
-    "@aragon/court": "1.0.0",
+    "@aragon/court": "1.1.0-rc.1",
     "@aragon/os": "^4.3.0"
   },
   "devDependencies": {
-    "@ablack/fundraising-presale": "^0.2.0",
     "@aragon/test-helpers": "^2.1.0",
     "@aragon/truffle-config-v5": "^1.0.0",
     "eslint": "^5.6.0",
