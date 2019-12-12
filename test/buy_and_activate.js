@@ -25,8 +25,6 @@ contract('Court presale and activate wrapper', ([_, owner, juror1, juror2, juror
   before('Deploy token, registry and presale', async () => {
     ({ collateralToken, bondedToken, registry, presale } = await deploy(owner, exchangeRate))
     await collateralToken.mint(juror1, INITIAL_BIG_TOKEN_AMOUNT)
-    // approve tokens
-    await collateralToken.approve(presale.address, INITIAL_BIG_TOKEN_AMOUNT, { from: juror1 })
   })
 
   context('Deployment fails', () => {
@@ -46,16 +44,13 @@ contract('Court presale and activate wrapper', ([_, owner, juror1, juror2, juror
   context('Succesfully deployed', () => {
     let cpa
 
-    beforeEach('Deploy airdrop contract and approve transfers', async () => {
+    beforeEach('Deploy airdrop contract', async () => {
       // deploy
       cpa = await CourtPresaleActivate.new(bondedToken.address, registry.address, presale.address, { from: owner })
-      // approve (reset first)
-      await bondedToken.approve(cpa.address, 0, { from: juror1 })
-      await bondedToken.approve(cpa.address, INITIAL_BIG_TOKEN_AMOUNT, { from: juror1 })
     })
 
     it('fails when amount is zero', async () => {
-      await assertRevert(cpa.buyAndActivate(0))
+      await assertRevert(collateralToken.approveAndCall(cpa.address, 0, '0x00'), ERROR_ZERO_AMOUNT)
     })
 
     it('buys, stakes and activates', async () => {
@@ -63,7 +58,7 @@ contract('Court presale and activate wrapper', ([_, owner, juror1, juror2, juror
       const initialActiveAmount = (await registry.balanceOf(juror1))[0]
       const bondedTokensToGet = await presale.contributionToTokens(amount);
 
-      await cpa.buyAndActivate(amount, { from: juror1 })
+      await collateralToken.approveAndCall(cpa.address, amount, '0x00', { from: juror1 })
 
       const finalActiveAmount = (await registry.balanceOf(juror1))[0]
       assertBn(finalActiveAmount, initialActiveAmount.add(bondedTokensToGet), `Active balance `)
