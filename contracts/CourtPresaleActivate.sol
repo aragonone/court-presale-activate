@@ -3,11 +3,12 @@ pragma solidity ^0.5.8;
 import "@aragon/court/contracts/lib/os/IsContract.sol";
 import "@aragon/court/contracts/lib/os/ERC20.sol";
 import "@aragon/court/contracts/lib/os/SafeERC20.sol";
+import "@aragon/court/contracts/standards/ApproveAndCall.sol";
 import "@aragon/court/contracts/standards/ERC900.sol";
 import "./lib/IPresale.sol";
 
 
-contract CourtPresaleActivate is IsContract{
+contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
     using SafeERC20 for ERC20;
 
     string private constant ERROR_TOKEN_NOT_CONTRACT = "CPA_TOKEN_NOT_CONTRACT";
@@ -15,6 +16,7 @@ contract CourtPresaleActivate is IsContract{
     string private constant ERROR_PRESALE_NOT_CONTRACT = "CPA_PRESALE_NOT_CONTRACT";
     string private constant ERROR_ZERO_AMOUNT = "CPA_ZERO_AMOUNT";
     string private constant ERROR_TOKEN_TRANSFER_FAILED = "CPA_TOKEN_TRANSFER_FAILED";
+    string private constant ERROR_WRONG_TOKEN = "CPA_WRONG_TOKEN";
 
     bytes32 internal constant ACTIVATE_DATA = keccak256("activate(uint256)");
 
@@ -32,23 +34,23 @@ contract CourtPresaleActivate is IsContract{
         presale = _presale;
     }
 
-    /**
-     * @dev User must first approve `_amount` of bondedToken to this contract
-     */
-    function buyAndActivate(uint256 _amount) external {
+    function receiveApproval(address _from, uint256 _amount, address _token, bytes calldata) external {
         require(_amount > 0, ERROR_ZERO_AMOUNT);
-        // sign activation
-        // TODO
+        require(_token == address(presale.contributionToken()), ERROR_WRONG_TOKEN);
+
+        // move tokens to this contract
+        require(ERC20(_token).safeTransferFrom(_from, address(this), _amount), ERROR_TOKEN_TRANSFER_FAILED);
+
+        // approve to presale
+        require(ERC20(_token).safeApprove(address(presale), _amount), ERROR_TOKEN_TRANSFER_FAILED);
 
         // buy in presale
-        presale.contribute(msg.sender, _amount);
-
+        presale.contribute(address(this), _amount);
         uint256 bondedTokensObtained = presale.contributionToTokens(_amount);
+
         // activate in registry
-        emit LogBAA(address(bondedToken), msg.sender, address(this), _amount);
-        require(bondedToken.safeTransferFrom(msg.sender, address(this), bondedTokensObtained), ERROR_TOKEN_TRANSFER_FAILED);
         bondedToken.approve(address(registry), bondedTokensObtained);
-        registry.stakeFor(msg.sender, bondedTokensObtained, abi.encodePacked(ACTIVATE_DATA));
+        registry.stakeFor(_from, bondedTokensObtained, abi.encodePacked(ACTIVATE_DATA));
     }
-    event LogBAA(address bt, address sender, address th, uint amount);
+
 }
