@@ -20,9 +20,11 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
 
     bytes32 internal constant ACTIVATE_DATA = keccak256("activate(uint256)");
 
-    ERC20 bondedToken;
-    ERC900 registry;
-    IPresale presale;
+    ERC20 public bondedToken;
+    ERC900 public registry;
+    IPresale public presale;
+
+    event BoughtAndActivated(address from, address collateralToken, uint256 buyAmount, uint256 activatedAmount);
 
     constructor(ERC20 _bondedToken, ERC900 _registry, IPresale _presale) public {
         require(isContract(address(_bondedToken)), ERROR_TOKEN_NOT_CONTRACT);
@@ -51,6 +53,7 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
         // activate in registry
         bondedToken.approve(address(registry), bondedTokensObtained);
         registry.stakeFor(_from, bondedTokensObtained, abi.encodePacked(ACTIVATE_DATA));
-    }
 
+        emit BoughtAndActivated(_from, _token, _amount, bondedTokensObtained);
+    }
 }
