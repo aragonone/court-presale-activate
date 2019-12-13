@@ -10,7 +10,10 @@
     "test": "GAS_LIMIT=10e6 npm run ganache-cli:test",
     "test:gas": "GAS_REPORTER=true npm test",
     "coverage": "SOLIDITY_COVERAGE=true npm run ganache-cli:test",
-    "ganache-cli:test": "./node_modules/@aragon/test-helpers/ganache-cli.sh"
+    "ganache-cli:test": "./node_modules/@aragon/test-helpers/ganache-cli.sh",
+    "deploy:rpc": "npx truffle exec scripts/deploy.js --network rpc",
+    "deploy:rinkeby": "npx truffle exec scripts/deploy.js --network rinkeby",
+    "deploy:mainnet": "npx truffle exec scripts/deploy.js --network mainnet"
   },
   "dependencies": {
     "@aragon/court": "1.0.0",
