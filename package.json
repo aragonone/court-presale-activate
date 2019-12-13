@@ -2,6 +2,8 @@
   "name": "court_presale_activate",
   "version": "0.1.0",
   "description": "Wrapper to buy tokens in the presale and activate them in the Court in one transaction",
+  "author": "Aragon One",
+  "license": "GPL-3.0",
   "scripts": {
     "compile": "truffle compile",
     "lint": "npm run lint:solidity && npm run lint:js",
@@ -13,7 +15,7 @@
     "ganache-cli:test": "./node_modules/@aragon/test-helpers/ganache-cli.sh"
   },
   "dependencies": {
-    "@aragon/court": "1.1.0-rc.1",
+    "@aragon/court": "1.1.0",
     "@aragon/os": "^4.3.0"
   },
   "devDependencies": {
@@ -33,7 +35,5 @@
     "truffle": "^5.0.34",
     "web3": "^1.2.1",
     "web3-eth-abi": "1.0.0-beta.33"
-  },
-  "author": "ßingen <bingen@aragon.one>",
-  "license": "ISC"
+  }
 }
