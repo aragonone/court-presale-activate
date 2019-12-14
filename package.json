@@ -38,6 +38,6 @@
     "web3": "^1.2.1",
     "web3-eth-abi": "1.0.0-beta.33"
   },
-  "author": "ßingen <bingen@aragon.one>",
+  "author": "Aragon Association <legal@aragon.org>",
   "license": "ISC"
 }
