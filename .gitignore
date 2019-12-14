@@ -5,6 +5,7 @@ node_modules/
 package-lock.json
 
 # Production
+abi/
 build/
 
 # coverage
