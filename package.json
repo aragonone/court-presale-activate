@@ -1,5 +1,5 @@
 {
-  "name": "court_presale_activate",
+  "name": "@aragon/court-presale-activate",
   "version": "0.1.0",
   "description": "Wrapper to buy tokens in the presale and activate them in the Court in one transaction",
   "scripts": {
