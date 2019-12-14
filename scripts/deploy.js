@@ -4,7 +4,7 @@ module.exports = async () => {
 
   if (process.argv.length != 6) {
     console.error('Usage: truffle exec scripts/deploy.js --network <network-name>')
-    exit(1)
+    process.exit(1)
   }
 
   try {
@@ -17,5 +17,6 @@ module.exports = async () => {
   } catch (error) {
     console.error(error)
   }
+  process.exit(0)
 }
 
