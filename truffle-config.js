@@ -4,5 +4,6 @@ const gasLimit = 10e6
 
 TruffleConfig.compilers.solc.version = '0.5.8'
 TruffleConfig.networks.rpc.gas = gasLimit
+TruffleConfig.networks.staging = TruffleConfig.networks.rinkeby
 
 module.exports = TruffleConfig

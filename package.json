@@ -12,6 +12,7 @@
     "coverage": "SOLIDITY_COVERAGE=true npm run ganache-cli:test",
     "ganache-cli:test": "./node_modules/@aragon/test-helpers/ganache-cli.sh",
     "deploy:rpc": "npx truffle exec scripts/deploy.js --network rpc",
+    "deploy:staging": "npx truffle exec scripts/deploy.js --network staging",
     "deploy:rinkeby": "npx truffle exec scripts/deploy.js --network rinkeby",
     "deploy:mainnet": "npx truffle exec scripts/deploy.js --network mainnet"
   },

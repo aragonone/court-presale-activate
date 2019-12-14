@@ -4,6 +4,11 @@
     "registry": "0x4eD6178D5dEf6AFD8e23334038609125cBB15C8F",
     "presale": "0x1902a0410EFe699487Dd85F12321aD672bE4ada2"
   },
+  "staging": {
+    "bondedToken": "0x17741e3521887D51298c573fc6ac1eeEF1E8e44B",
+    "registry": "0xa0c3f2c814Cd2Ccf7666b0abf9C3E7530e642771",
+    "presale": "0xEA8919da52Ac77f73dF37cC8c60e1105aE134171"
+  },
   "rinkeby": {
     "bondedToken": "0x1B1EdCF4f3C5bB705a7670154e2C65569d0676Be",
     "registry": "0x0178502ED5D6e2D3BDE12D541FD2DB1596d238aA",
