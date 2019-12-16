@@ -1,6 +1,6 @@
 {
   "name": "@aragon/court-presale-activate",
-  "version": "0.2.0",
+  "version": "1.0.0",
   "description": "Wrapper to buy tokens in the presale and activate them in the Court in one transaction",
   "scripts": {
     "compile": "truffle compile",
