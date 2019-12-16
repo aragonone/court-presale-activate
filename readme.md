@@ -9,7 +9,7 @@ This contract only exposes the following function. It should be called by the co
 ```solidity
 /**
 * @dev This function must be triggered by the contribution token approve-and-call fallback.
-*      It will pull the approved tokens and covert them into the presale instance, and activate the converted tokens into a
+*      It will pull the approved tokens and convert them into the presale instance, and activate the converted tokens into a
 *      jurors registry instance of an Aragon Court.
 * @param _from Address of the original caller (juror) converting and activating the tokens 
 * @param _amount Amount of contribution tokens to be converted and activated
