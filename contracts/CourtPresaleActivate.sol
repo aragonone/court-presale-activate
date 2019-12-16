@@ -36,6 +36,15 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
         presale = _presale;
     }
 
+    /**
+    * @dev This function must be triggered by the contribution token approve-and-call fallback.
+    *      It will pull the approved tokens and covert them into the presale instance, and activate the converted tokens into a
+    *      jurors registry instance of an Aragon Court.
+    * @param _from Address of the original caller (juror) converting and activating the tokens
+    * @param _amount Amount of contribution tokens to be converted and activated
+    * @param _token Address of the contribution token triggering the approve-and-call fallback
+    * @param Extra-data not used in this function, declared only for compatibility reasons
+    */
     function receiveApproval(address _from, uint256 _amount, address _token, bytes calldata) external {
         require(_amount > 0, ERROR_ZERO_AMOUNT);
         require(_token == address(presale.contributionToken()), ERROR_WRONG_TOKEN);
