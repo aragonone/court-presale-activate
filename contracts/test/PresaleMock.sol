@@ -57,6 +57,10 @@ contract PresaleMock is IPresale {
         return collateralToken;
     }
 
+    function setCollateralToken(ERC20 _collateralToken) external {
+        collateralToken = _collateralToken;
+    }
+
     function _transfer(ERC20 _token, address _from, address _to, uint256 _amount) internal {
         if (_from == address(this)) {
             require(_token.safeTransfer(_to, _amount), ERROR_TOKEN_TRANSFER_REVERTED);

@@ -18,6 +18,7 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
     string private constant ERROR_UNISWAP_FACTORY_NOT_CONTRACT = "CPA_UNISWAP_FACTORY_NOT_CONTRACT";
     string private constant ERROR_ZERO_AMOUNT = "CPA_ZERO_AMOUNT";
     string private constant ERROR_TOKEN_TRANSFER_FAILED = "CPA_TOKEN_TRANSFER_FAILED";
+    string private constant ERROR_TOKEN_APPROVAL_FAILED = "CPA_TOKEN_APPROVAL_FAILED";
     string private constant ERROR_WRONG_TOKEN = "CPA_WRONG_TOKEN";
 
     bytes32 internal constant ACTIVATE_DATA = keccak256("activate(uint256)");
@@ -121,7 +122,7 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
 
     function _buyAndActivate(address _from, uint256 _amount, address _token) internal {
         // approve to presale
-        require(ERC20(_token).safeApprove(address(presale), _amount), ERROR_TOKEN_TRANSFER_FAILED);
+        require(ERC20(_token).safeApprove(address(presale), _amount), ERROR_TOKEN_APPROVAL_FAILED);
 
         // buy in presale
         presale.contribute(address(this), _amount);
