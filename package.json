@@ -45,6 +45,7 @@
     "solium": "^1.2.3",
     "truffle": "^5.0.34",
     "truffle-extract": "^1.2.1",
+    "truffle-flattener": "^1.4.2",
     "web3": "^1.2.1",
     "web3-eth-abi": "1.0.0-beta.33"
   },
