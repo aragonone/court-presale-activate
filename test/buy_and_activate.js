@@ -7,6 +7,7 @@ const { bn, bigExp } = require('@aragon/court/test/helpers/lib/numbers')
 const { deploy } = require('./helpers/deploy')
 
 const ERC20 = artifacts.require('ERC20Mock')
+const ERC20Bad = artifacts.require('ERC20BadMock')
 const UniswapExchange = artifacts.require('UniswapExchangeMock')
 const CourtPresaleActivate = artifacts.require('CourtPresaleActivate')
 
@@ -20,6 +21,9 @@ contract('Court presale and activate wrapper', ([_, owner, juror1, juror2, juror
   const ERROR_PRESALE_NOT_CONTRACT = 'CPA_PRESALE_NOT_CONTRACT'
   const ERROR_UNISWAP_FACTORY_NOT_CONTRACT = 'CPA_UNISWAP_FACTORY_NOT_CONTRACT'
   const ERROR_ZERO_AMOUNT = 'CPA_ZERO_AMOUNT'
+  const ERROR_WRONG_TOKEN = 'CPA_WRONG_TOKEN'
+  const ERROR_TOKEN_TRANSFER_FAILED = 'CPA_TOKEN_TRANSFER_FAILED'
+  const ERROR_TOKEN_APPROVAL_FAILED = 'CPA_TOKEN_APPROVAL_FAILED'
 
   const INITIAL_BIG_TOKEN_AMOUNT = bigExp(1, 24)
   const exchangeRate = bn(200)
@@ -83,6 +87,13 @@ contract('Court presale and activate wrapper', ([_, owner, juror1, juror2, juror
         const finalActiveAmount = (await registry.balanceOf(juror1))[0]
         assertBn(finalActiveAmount, initialActiveAmount.add(bondedTokensToGet), `Active balance `)
       })
+
+      it('fails in receive approval with wrong token', async () => {
+        const amount = DEFAULTS.minActiveBalance.mul(PPM).div(exchangeRate)
+
+        await bondedToken.approve(cpa.address, amount, { from: juror1 })
+        await assertRevert(cpa.receiveApproval(juror1, amount, bondedToken.address, '0x00', { from: juror1 }), ERROR_WRONG_TOKEN)
+      })
     })
 
     context('Using Uniswap', () => {
@@ -106,7 +117,7 @@ contract('Court presale and activate wrapper', ([_, owner, juror1, juror2, juror
           await assertRevert(cpa.contributeExternalToken(externalToken.address, juror1, 0, 1, 1, 0), ERROR_ZERO_AMOUNT)
         })
 
-        it.only('buys, stakes and activates', async () => {
+        it('buys, stakes and activates', async () => {
           const externalExchangeRate = bn(500000)
           await uniswapExchange.setExchangeRate(externalToken.address, externalExchangeRate)
           const collateralAmount = DEFAULTS.minActiveBalance.mul(PPM).div(exchangeRate)
@@ -129,8 +140,8 @@ contract('Court presale and activate wrapper', ([_, owner, juror1, juror2, juror
           await assertRevert(cpa.contributeEth(1, 0, { from: juror1, value: 0 }), ERROR_ZERO_AMOUNT)
         })
 
-        it.only('buys, stakes and activates', async () => {
-          const ethExchangeRate = bn(50000000)
+        it('buys, stakes and activates', async () => {
+          const ethExchangeRate = bn(50000000000)
           await uniswapExchange.setExchangeRate(ETH, ethExchangeRate)
           const collateralAmount = DEFAULTS.minActiveBalance.mul(PPM).div(exchangeRate)
           const ethAmount = collateralAmount.mul(PPM).div(ethExchangeRate)
@@ -143,6 +154,56 @@ contract('Court presale and activate wrapper', ([_, owner, juror1, juror2, juror
           assertBn(finalActiveAmount, initialActiveAmount.add(bondedTokensToGet), `Active balance `)
         })
       })
+    })
+  })
+
+  context('Bad tokens', () => {
+    let cpa, badCollateralToken, badExternalToken
+
+    beforeEach('Deploy airdrop contract', async () => {
+      // deploy bad tokens
+      badCollateralToken = await ERC20Bad.new('Collateral Bad Token', 'BCT', 18)
+      await badCollateralToken.mint(juror1, INITIAL_BIG_TOKEN_AMOUNT)
+      badExternalToken = await ERC20Bad.new('External Token', 'ET', 18)
+      await badExternalToken.mint(juror1, INITIAL_BIG_TOKEN_AMOUNT)
+
+      // add it to Presale
+      await presale.setCollateralToken(badCollateralToken.address)
+
+      // deploy wrapper
+      cpa = await CourtPresaleActivate.new(badCollateralToken.address, registry.address, presale.address, uniswapFactory.address, { from: owner })
+    })
+
+    it('receive approval fails if collateral token transfer fails', async () => {
+      const amount = DEFAULTS.minActiveBalance.mul(PPM).div(exchangeRate)
+
+      // make token misbehave
+      await badCollateralToken.setTransferMisbehave(true)
+
+      await assertRevert(badCollateralToken.approveAndCall(cpa.address, amount, '0x00', { from: juror1 }), ERROR_TOKEN_TRANSFER_FAILED)
+    })
+
+    it('receive approval fails if collateral token approve fails', async () => {
+      const amount = DEFAULTS.minActiveBalance.mul(PPM).div(exchangeRate)
+
+      await badCollateralToken.approve(cpa.address, amount, { from: juror1 })
+      // make token misbehave
+      await badCollateralToken.setApproveMisbehave(true)
+
+      await assertRevert(cpa.receiveApproval(juror1, amount, badCollateralToken.address, '0x00', { from: juror1 }), ERROR_TOKEN_APPROVAL_FAILED)
+    })
+
+    it('contribute external token fails if collateral token transfer fails', async () => {
+      const externalExchangeRate = bn(500000)
+      const collateralAmount = DEFAULTS.minActiveBalance.mul(PPM).div(exchangeRate)
+      const externalAmount = collateralAmount.mul(PPM).div(externalExchangeRate)
+
+      await badExternalToken.approve(cpa.address, externalAmount, { from: juror1 })
+
+      // make token misbehave
+      await badExternalToken.setTransferMisbehave(true)
+
+      await assertRevert(cpa.contributeExternalToken(badExternalToken.address, juror1, externalAmount, 1, 1, 0, { from: juror1 }), ERROR_TOKEN_TRANSFER_FAILED)
     })
   })
 })
