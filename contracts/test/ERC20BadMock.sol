@@ -4,6 +4,9 @@ import "@aragon/court/contracts/lib/os/SafeMath.sol";
 import "@aragon/court/contracts/standards/ApproveAndCall.sol";
 
 
+/**
+* This contract allows to set flags to return false on approve and transfer functions
+*/
 contract ERC20BadMock {
     using SafeMath for uint256;
 

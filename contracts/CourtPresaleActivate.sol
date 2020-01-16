@@ -6,7 +6,8 @@ import "@aragon/court/contracts/lib/os/SafeERC20.sol";
 import "@aragon/court/contracts/standards/ApproveAndCall.sol";
 import "@aragon/court/contracts/standards/ERC900.sol";
 import "./lib/IPresale.sol";
-import "./lib/IUniswap.sol";
+import "./lib/uniswap/interfaces/IUniswapExchange.sol";
+import "./lib/uniswap/interfaces/IUniswapFactory.sol";
 
 
 contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
@@ -88,11 +89,12 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
         require(ERC20(_token).safeTransferFrom(_from, address(this), _amount), ERROR_TOKEN_TRANSFER_FAILED);
 
         // get the Uniswap exchange for the contribution token
-        address contributionTokenAddress = address(presale.contributionToken());
-        IUniswapExchange uniswapExchange = IUniswapExchange(uniswapFactory.getExchange(contributionTokenAddress));
+        IUniswapExchange uniswapExchange = IUniswapExchange(uniswapFactory.getExchange(_token));
 
         // swap tokens
-        uint256 contributionTokenAmount = uniswapExchange.tokenToTokenSwapInput(_amount, _minTokens, _minEth, _deadline, _token);
+        address contributionTokenAddress = address(presale.contributionToken());
+        require(ERC20(_token).safeApprove(address(uniswapExchange), _amount), ERROR_TOKEN_APPROVAL_FAILED);
+        uint256 contributionTokenAmount = uniswapExchange.tokenToTokenSwapInput(_amount, _minTokens, _minEth, _deadline, contributionTokenAddress);
 
         // buy in presale
         _buyAndActivate(_from, contributionTokenAmount, contributionTokenAddress);

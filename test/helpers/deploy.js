@@ -4,7 +4,7 @@ const { DEFAULTS } = require('@aragon/court/test/helpers/wrappers/court')(web3, 
 const ERC20 = artifacts.require('ERC20Mock')
 const Presale = artifacts.require('PresaleMock.sol')
 const JurorsRegistry = artifacts.require('JurorsRegistry')
-const UniswapFactory = artifacts.require('UniswapFactoryMock')
+const UniswapFactory = artifacts.require('UniswapFactory')
 
 const deployRegistry = async (owner) => {
   const TOTAL_ACTIVE_BALANCE_LIMIT = bigExp(100e6, 18)
@@ -46,8 +46,10 @@ const deployUniswap = async (collateralToken) => {
   return { uniswapFactory }
 }
 
-const deploy = async (owner, exchangeRate, ) => {
-  const collateralToken = await ERC20.new('Collateral Token', 'BT', 18)
+const deploy = async (owner, exchangeRate, collateralToken = undefined) => {
+  if (!collateralToken) {
+    collateralToken = await ERC20.new('Collateral Token', 'CT', 18)
+  }
 
   const { bondedToken, registry } = await deployRegistry(owner)
   const { presale } = await deployPresale(owner, collateralToken, bondedToken, exchangeRate)
