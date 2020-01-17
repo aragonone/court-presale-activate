@@ -21,6 +21,8 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
     string private constant ERROR_TOKEN_TRANSFER_FAILED = "CPA_TOKEN_TRANSFER_FAILED";
     string private constant ERROR_TOKEN_APPROVAL_FAILED = "CPA_TOKEN_APPROVAL_FAILED";
     string private constant ERROR_WRONG_TOKEN = "CPA_WRONG_TOKEN";
+    string private constant ERROR_ETH_REFUND = "CPA_ETH_REFUND";
+    string private constant ERROR_TOKEN_REFUND = "CPA_TOKEN_REFUND";
 
     bytes32 internal constant ACTIVATE_DATA = keccak256("activate(uint256)");
 
@@ -59,6 +61,9 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
         require(ERC20(_token).safeTransferFrom(_from, address(this), _amount), ERROR_TOKEN_TRANSFER_FAILED);
 
         _buyAndActivate(_from, _amount, _token);
+
+        // refund leftovers if any
+        refund(_token);
     }
 
     /**
@@ -96,6 +101,10 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
 
         // buy in presale
         _buyAndActivate(msg.sender, contributionTokenAmount, contributionTokenAddress);
+
+        // refund leftovers if any
+        refund(_token);
+        refund(contributionTokenAddress);
     }
 
     /**
@@ -118,6 +127,13 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
 
         // buy in presale
         _buyAndActivate(msg.sender, contributionTokenAmount, contributionTokenAddress);
+
+        // make sure there's no ETH left
+        uint256 ethBalance = address(this).balance;
+        if (ethBalance > 0) {
+            (bool result,) = msg.sender.call.value(ethBalance)("");
+            require(result, ERROR_ETH_REFUND);
+        }
     }
 
     function _buyAndActivate(address _from, uint256 _amount, address _token) internal {
@@ -132,6 +148,18 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
         bondedToken.approve(address(registry), bondedTokensObtained);
         registry.stakeFor(_from, bondedTokensObtained, abi.encodePacked(ACTIVATE_DATA));
 
+        // refund leftovers if any
+        refund(address(bondedToken));
+
         emit BoughtAndActivated(_from, _token, _amount, bondedTokensObtained);
+    }
+
+    function refund(address _tokenAddress) internal {
+        ERC20 token = ERC20(_tokenAddress);
+
+        uint256 selfBalance = token.balanceOf(address(this));
+        if (selfBalance > 0) {
+            require(token.safeTransfer(msg.sender, selfBalance), ERROR_TOKEN_REFUND);
+        }
     }
 }
