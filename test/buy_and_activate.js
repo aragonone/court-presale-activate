@@ -1,5 +1,6 @@
 const { assertBn } = require('@aragon/court/test/helpers/asserts/assertBn')
 const { assertRevert } = require('@aragon/court/test/helpers/asserts/assertThrow')
+const getBalance = require('@aragon/test-helpers/balance')(web3)
 const getBlockNumber = require('@aragon/test-helpers/blockNumber')(web3)
 const getBlock = require('@aragon/test-helpers/block')(web3)
 const { DEFAULTS } = require('@aragon/court/test/helpers/wrappers/court')(web3, artifacts)
@@ -92,6 +93,8 @@ contract('Court presale and activate wrapper', ([_, owner, provider, juror1]) =>
 
           const finalActiveAmount = (await registry.balanceOf(juror1))[0]
           assertBn(finalActiveAmount, initialActiveAmount.add(bondedTokensToGet), `Active balance `)
+          assert.equal((await collateralToken.balanceOf(cpa.address)).toNumber(), 0, 'Wrapper collateral token balance should always be zero')
+          assert.equal((await bondedToken.balanceOf(cpa.address)).toNumber(), 0, 'Wrapper bonded token balance should always be zero')
         })
 
         it('fails in receive approval with wrong token', async () => {
@@ -147,6 +150,9 @@ contract('Court presale and activate wrapper', ([_, owner, provider, juror1]) =>
 
             const finalActiveAmount = (await registry.balanceOf(juror1))[0]
             assertBn(finalActiveAmount, initialActiveAmount.add(bondedTokensToGet), `Active balance `)
+            assert.equal((await externalToken.balanceOf(cpa.address)).toNumber(), 0, 'Wrapper external token balance should always be zero')
+            assert.equal((await collateralToken.balanceOf(cpa.address)).toNumber(), 0, 'Wrapper collateral token balance should always be zero')
+            assert.equal((await bondedToken.balanceOf(cpa.address)).toNumber(), 0, 'Wrapper bonded token balance should always be zero')
           })
         })
 
@@ -167,6 +173,9 @@ contract('Court presale and activate wrapper', ([_, owner, provider, juror1]) =>
 
             const finalActiveAmount = (await registry.balanceOf(juror1))[0]
             assertBn(finalActiveAmount, initialActiveAmount.add(bondedTokensToGet), `Active balance `)
+            assert.equal(await getBalance(cpa.address), "0", 'Wrapper ETH balance should always be zero')
+            assert.equal((await collateralToken.balanceOf(cpa.address)).toNumber(), 0, 'Wrapper collateral token balance should always be zero')
+            assert.equal((await bondedToken.balanceOf(cpa.address)).toNumber(), 0, 'Wrapper bonded token balance should always be zero')
           })
         })
       })
