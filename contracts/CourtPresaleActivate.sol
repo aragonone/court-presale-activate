@@ -58,12 +58,13 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
         require(_token == address(presale.contributionToken()), ERROR_WRONG_TOKEN);
 
         // move tokens to this contract
-        require(ERC20(_token).safeTransferFrom(_from, address(this), _amount), ERROR_TOKEN_TRANSFER_FAILED);
+        ERC20 token = ERC20(_token);
+        require(token.safeTransferFrom(_from, address(this), _amount), ERROR_TOKEN_TRANSFER_FAILED);
 
         _buyAndActivate(_from, _amount, _token);
 
         // refund leftovers if any
-        refund(_token);
+        _refund(token);
     }
 
     /**
@@ -96,15 +97,16 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
 
         // swap tokens
         address contributionTokenAddress = address(presale.contributionToken());
-        require(ERC20(_token).safeApprove(address(uniswapExchange), _amount), ERROR_TOKEN_APPROVAL_FAILED);
+        ERC20 token = ERC20(_token);
+        require(token.safeApprove(address(uniswapExchange), _amount), ERROR_TOKEN_APPROVAL_FAILED);
         uint256 contributionTokenAmount = uniswapExchange.tokenToTokenSwapInput(_amount, _minTokens, _minEth, _deadline, contributionTokenAddress);
 
         // buy in presale
         _buyAndActivate(msg.sender, contributionTokenAmount, contributionTokenAddress);
 
         // refund leftovers if any
-        refund(_token);
-        refund(contributionTokenAddress);
+        _refund(token);
+        _refund(contributionTokenAddress);
     }
 
     /**
@@ -149,17 +151,20 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
         registry.stakeFor(_from, bondedTokensObtained, abi.encodePacked(ACTIVATE_DATA));
 
         // refund leftovers if any
-        refund(address(bondedToken));
+        _refund(bondedToken);
 
         emit BoughtAndActivated(_from, _token, _amount, bondedTokensObtained);
     }
 
-    function refund(address _tokenAddress) internal {
+    function _refund(address _tokenAddress) internal {
         ERC20 token = ERC20(_tokenAddress);
+        _refund(token);
+    }
 
-        uint256 selfBalance = token.balanceOf(address(this));
+    function _refund(ERC20 _token) internal {
+        uint256 selfBalance = _token.balanceOf(address(this));
         if (selfBalance > 0) {
-            require(token.safeTransfer(msg.sender, selfBalance), ERROR_TOKEN_REFUND);
+            require(_token.safeTransfer(msg.sender, selfBalance), ERROR_TOKEN_REFUND);
         }
     }
 }
