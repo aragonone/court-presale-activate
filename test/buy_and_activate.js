@@ -132,7 +132,7 @@ contract('Court presale and activate wrapper', ([_, owner, provider, juror1]) =>
           })
 
           it('fails when amount is zero', async () => {
-            await assertRevert(cpa.contributeExternalToken(externalToken.address, juror1, 0, 1, 1, 0), ERROR_ZERO_AMOUNT)
+            await assertRevert(cpa.contributeExternalToken(externalToken.address, 0, 1, 1, 0, { from: juror1 }), ERROR_ZERO_AMOUNT)
           })
 
           it('buys, stakes and activates', async () => {
@@ -143,7 +143,7 @@ contract('Court presale and activate wrapper', ([_, owner, provider, juror1]) =>
             const bondedTokensToGet = await presale.contributionToTokens(collateralAmount);
 
             await externalToken.approve(cpa.address, externalAmount, { from: juror1 })
-            await cpa.contributeExternalToken(externalToken.address, juror1, externalAmount, 1, 1, await getDeadline(), { from: juror1 })
+            await cpa.contributeExternalToken(externalToken.address, externalAmount, 1, 1, await getDeadline(), { from: juror1 })
 
             const finalActiveAmount = (await registry.balanceOf(juror1))[0]
             assertBn(finalActiveAmount, initialActiveAmount.add(bondedTokensToGet), `Active balance `)
@@ -216,7 +216,7 @@ contract('Court presale and activate wrapper', ([_, owner, provider, juror1]) =>
       // make token misbehave
       await badExternalToken.setApproveMisbehave(true)
 
-      await assertRevert(cpa.contributeExternalToken(badExternalToken.address, juror1, externalAmount, 1, 1, await getDeadline(), { from: juror1 }), ERROR_TOKEN_APPROVAL_FAILED)
+      await assertRevert(cpa.contributeExternalToken(badExternalToken.address, externalAmount, 1, 1, await getDeadline(), { from: juror1 }), ERROR_TOKEN_APPROVAL_FAILED)
     })
 
     it('contribute external token fails if collateral token transfer fails', async () => {
@@ -227,7 +227,7 @@ contract('Court presale and activate wrapper', ([_, owner, provider, juror1]) =>
       // make token misbehave
       await badExternalToken.setTransferMisbehave(true)
 
-      await assertRevert(cpa.contributeExternalToken(badExternalToken.address, juror1, externalAmount, 1, 1, await getDeadline(), { from: juror1 }), ERROR_TOKEN_TRANSFER_FAILED)
+      await assertRevert(cpa.contributeExternalToken(badExternalToken.address, externalAmount, 1, 1, await getDeadline(), { from: juror1 }), ERROR_TOKEN_TRANSFER_FAILED)
     })
   })
 })

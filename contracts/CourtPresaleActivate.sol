@@ -67,7 +67,6 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
     *      convert the obtained tokens in the presale instance, and activate the converted tokens in the
     *      jurors registry instance of the Aragon Court.
     * @param _token Address of the external contribution token used
-    * @param _from Address of the original caller (juror) converting and activating the tokens
     * @param _amount Amount of contribution tokens to be converted and activated
     * @param _minTokens Minimum amount of presale contribution tokens obtained in Uniswap
     * @param _minEth Minimum amount of ETH obtained in Uniswap (Uniswap internally converts first to ETH and then to target token)
@@ -75,7 +74,6 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
     */
     function contributeExternalToken(
         address _token,
-        address _from,
         uint256 _amount,
         uint256 _minTokens,
         uint256 _minEth,
@@ -86,7 +84,7 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
         require(_amount > 0, ERROR_ZERO_AMOUNT);
 
         // move tokens to this contract
-        require(ERC20(_token).safeTransferFrom(_from, address(this), _amount), ERROR_TOKEN_TRANSFER_FAILED);
+        require(ERC20(_token).safeTransferFrom(msg.sender, address(this), _amount), ERROR_TOKEN_TRANSFER_FAILED);
 
         // get the Uniswap exchange for the contribution token
         IUniswapExchange uniswapExchange = IUniswapExchange(uniswapFactory.getExchange(_token));
@@ -97,7 +95,7 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
         uint256 contributionTokenAmount = uniswapExchange.tokenToTokenSwapInput(_amount, _minTokens, _minEth, _deadline, contributionTokenAddress);
 
         // buy in presale
-        _buyAndActivate(_from, contributionTokenAmount, contributionTokenAddress);
+        _buyAndActivate(msg.sender, contributionTokenAmount, contributionTokenAddress);
     }
 
     /**
