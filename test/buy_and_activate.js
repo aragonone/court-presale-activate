@@ -112,10 +112,10 @@ contract('Court presale and activate wrapper', ([_, owner, provider, juror1]) =>
 
         const addLiquidity = async (token) => {
           const ethAmount = bigExp(1, 18)
-          const uniswapCollateralExchangeAddress = await uniswapFactory.getExchange(token.address)
-          const uniswapExchange = await UniswapExchange.at(uniswapCollateralExchangeAddress)
+          const uniswapExchangeAddress = await uniswapFactory.getExchange(token.address)
+          const uniswapExchange = await UniswapExchange.at(uniswapExchangeAddress)
           await token.mint(provider, INITIAL_BIG_TOKEN_AMOUNT)
-          await token.approve(uniswapCollateralExchangeAddress, INITIAL_BIG_TOKEN_AMOUNT, { from: provider })
+          await token.approve(uniswapExchangeAddress, INITIAL_BIG_TOKEN_AMOUNT, { from: provider })
           await uniswapExchange.addLiquidity(0, INITIAL_BIG_TOKEN_AMOUNT, await getDeadline(), { from: provider, value: ethAmount })
 
           return uniswapExchange
