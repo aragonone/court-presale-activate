@@ -23,6 +23,7 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
     string private constant ERROR_WRONG_TOKEN = "CPA_WRONG_TOKEN";
     string private constant ERROR_ETH_REFUND = "CPA_ETH_REFUND";
     string private constant ERROR_TOKEN_REFUND = "CPA_TOKEN_REFUND";
+    string private constant ERROR_UNISWAP_UNAVAILABLE = "CPA_UNISWAP_UNAVAILABLE";
 
     bytes32 internal constant ACTIVATE_DATA = keccak256("activate(uint256)");
 
@@ -93,7 +94,9 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
         require(ERC20(_token).safeTransferFrom(msg.sender, address(this), _amount), ERROR_TOKEN_TRANSFER_FAILED);
 
         // get the Uniswap exchange for the contribution token
-        IUniswapExchange uniswapExchange = IUniswapExchange(uniswapFactory.getExchange(_token));
+        address payable uniswapExchangeAddress = uniswapFactory.getExchange(_token);
+        require(uniswapExchangeAddress != address(0), ERROR_UNISWAP_UNAVAILABLE);
+        IUniswapExchange uniswapExchange = IUniswapExchange(uniswapExchangeAddress);
 
         // swap tokens
         address contributionTokenAddress = address(presale.contributionToken());
@@ -122,7 +125,9 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
         address contributionTokenAddress = address(presale.contributionToken());
 
         // get the Uniswap exchange for the contribution token
-        IUniswapExchange uniswapExchange = IUniswapExchange(uniswapFactory.getExchange(contributionTokenAddress));
+        address payable uniswapExchangeAddress = uniswapFactory.getExchange(contributionTokenAddress);
+        require(uniswapExchangeAddress != address(0), ERROR_UNISWAP_UNAVAILABLE);
+        IUniswapExchange uniswapExchange = IUniswapExchange(uniswapExchangeAddress);
 
         // swap tokens
         uint256 contributionTokenAmount = uniswapExchange.ethToTokenSwapInput.value(msg.value)(_minTokens, _deadline);

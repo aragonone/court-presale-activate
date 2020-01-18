@@ -10,6 +10,7 @@ const { deploy } = require('./helpers/deploy')
 
 const ERC20 = artifacts.require('ERC20Mock')
 const ERC20Bad = artifacts.require('ERC20BadMock')
+const UniswapFactory = artifacts.require('UniswapFactory')
 const UniswapExchange = artifacts.require('UniswapExchange')
 const CourtPresaleActivate = artifacts.require('CourtPresaleActivate')
 
@@ -29,6 +30,7 @@ contract('Court presale and activate wrapper', ([_, owner, provider, juror1]) =>
   const ERROR_WRONG_TOKEN = 'CPA_WRONG_TOKEN'
   const ERROR_TOKEN_TRANSFER_FAILED = 'CPA_TOKEN_TRANSFER_FAILED'
   const ERROR_TOKEN_APPROVAL_FAILED = 'CPA_TOKEN_APPROVAL_FAILED'
+  const ERROR_UNISWAP_UNAVAILABLE = 'CPA_UNISWAP_UNAVAILABLE'
 
   const INITIAL_BIG_TOKEN_AMOUNT = bigExp(1, 24)
   const exchangeRate = bn(200000)
@@ -37,7 +39,7 @@ contract('Court presale and activate wrapper', ([_, owner, provider, juror1]) =>
   context('Regular tokens', () => {
 
     beforeEach('Deploy token, registry and presale', async () => {
-      ({ collateralToken, bondedToken, registry, presale, uniswapFactory } = await deploy(owner, exchangeRate))
+      ({ collateralToken, bondedToken, registry, presale, uniswapFactory } = await deploy({ owner, exchangeRate }))
       await collateralToken.mint(juror1, INITIAL_BIG_TOKEN_AMOUNT)
     })
 
@@ -173,7 +175,7 @@ contract('Court presale and activate wrapper', ([_, owner, provider, juror1]) =>
 
             const finalActiveAmount = (await registry.balanceOf(juror1))[0]
             assertBn(finalActiveAmount, initialActiveAmount.add(bondedTokensToGet), `Active balance `)
-            assert.equal(await getBalance(cpa.address), "0", 'Wrapper ETH balance should always be zero')
+            assert.equal(await getBalance(cpa.address), '0', 'Wrapper ETH balance should always be zero')
             assert.equal((await collateralToken.balanceOf(cpa.address)).toNumber(), 0, 'Wrapper collateral token balance should always be zero')
             assert.equal((await bondedToken.balanceOf(cpa.address)).toNumber(), 0, 'Wrapper bonded token balance should always be zero')
           })
@@ -192,7 +194,10 @@ contract('Court presale and activate wrapper', ([_, owner, provider, juror1]) =>
       badExternalToken = await ERC20Bad.new('External Bad Token', 'EBT', 18)
       await badExternalToken.mint(juror1, INITIAL_BIG_TOKEN_AMOUNT)
 
-      const { registry, presale, uniswapFactory } = await deploy(owner, exchangeRate, badCollateralToken)
+      const { registry, presale, uniswapFactory } = await deploy({ owner, exchangeRate, collateralToken: badCollateralToken })
+
+      // set up in Uniswap
+      await uniswapFactory.createExchange(badExternalToken.address)
 
       // deploy wrapper
       cpa = await CourtPresaleActivate.new(badCollateralToken.address, registry.address, presale.address, uniswapFactory.address, { from: owner })
@@ -239,4 +244,41 @@ contract('Court presale and activate wrapper', ([_, owner, provider, juror1]) =>
       await assertRevert(cpa.contributeExternalToken(badExternalToken.address, externalAmount, 1, 1, await getDeadline(), { from: juror1 }), ERROR_TOKEN_TRANSFER_FAILED)
     })
   })
+
+  context('Without Uniswap exchange', () => {
+    let cpa
+
+    beforeEach('Deploy airdrop contract', async () => {
+      const uniswapFactory = await UniswapFactory.new()
+      const { collateralToken, registry, presale } = await deploy({ owner, exchangeRate, uniswapFactory })
+
+      // deploy wrapper
+      cpa = await CourtPresaleActivate.new(collateralToken.address, registry.address, presale.address, uniswapFactory.address, { from: owner })
+    })
+
+    context('External token', () => {
+      let externalToken
+
+      beforeEach('deploy external token, mint and create Uniswap exchange', async () => {
+        externalToken = await ERC20.new('External Token', 'ET', 18)
+        await externalToken.mint(juror1, INITIAL_BIG_TOKEN_AMOUNT)
+      })
+
+      it('fails when there is no Uniswap exchange', async () => {
+        const externalAmount = bigExp(1, 21)
+        await externalToken.approve(cpa.address, externalAmount, { from: juror1 })
+        await assertRevert(cpa.contributeExternalToken(externalToken.address, externalAmount, 1, 1, 0, { from: juror1 }), ERROR_UNISWAP_UNAVAILABLE)
+      })
+    })
+
+    context('ETH', () => {
+      const ETH = '0x' + '0'.repeat(40)
+
+      it('fails when there is no Uniswap exchange', async () => {
+        const ethAmount = bigExp(1, 16)
+        await assertRevert(cpa.contributeEth(1, await getDeadline(), { from: juror1, value: ethAmount }), ERROR_UNISWAP_UNAVAILABLE)
+      })
+    })
+  })
+
 })
