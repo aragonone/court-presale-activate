@@ -46,14 +46,22 @@ const deployUniswap = async (collateralToken) => {
   return { uniswapFactory }
 }
 
-const deploy = async (owner, exchangeRate, collateralToken = undefined) => {
+const deploy = async ({
+  owner,
+  exchangeRate,
+  collateralToken,
+  uniswapFactory
+}) => {
   if (!collateralToken) {
     collateralToken = await ERC20.new('Collateral Token', 'CT', 18)
   }
 
   const { bondedToken, registry } = await deployRegistry(owner)
   const { presale } = await deployPresale(owner, collateralToken, bondedToken, exchangeRate)
-  const { uniswapFactory } = await deployUniswap(collateralToken)
+
+  if (!uniswapFactory) {
+    uniswapFactory = (await deployUniswap(collateralToken)).uniswapFactory
+  }
 
   return { collateralToken, bondedToken, registry, presale, uniswapFactory }
 }
