@@ -67,6 +67,7 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
         if (_data.length > 0) {
             activate = true;
         }
+
         _buyAndActivate(_from, _amount, _token, activate);
 
         // refund leftovers if any
@@ -100,16 +101,23 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
         // move tokens to this contract
         require(ERC20(_token).safeTransferFrom(msg.sender, address(this), _amount), ERROR_TOKEN_TRANSFER_FAILED);
 
-        // get the Uniswap exchange for the contribution token
+        // get the Uniswap exchange for the external token
         address payable uniswapExchangeAddress = uniswapFactory.getExchange(_token);
         require(uniswapExchangeAddress != address(0), ERROR_UNISWAP_UNAVAILABLE);
         IUniswapExchange uniswapExchange = IUniswapExchange(uniswapExchangeAddress);
 
-        // swap tokens
-        address contributionTokenAddress = address(presale.contributionToken());
         ERC20 token = ERC20(_token);
         require(token.safeApprove(address(uniswapExchange), _amount), ERROR_TOKEN_APPROVAL_FAILED);
-        uint256 contributionTokenAmount = uniswapExchange.tokenToTokenSwapInput(_amount, _minTokens, _minEth, _deadline, contributionTokenAddress);
+
+        // swap tokens
+        address contributionTokenAddress = address(presale.contributionToken());
+        uint256 contributionTokenAmount = uniswapExchange.tokenToTokenSwapInput(
+            _amount,
+            _minTokens,
+            _minEth,
+            _deadline,
+            contributionTokenAddress
+        );
 
         // buy in presale
         _buyAndActivate(msg.sender, contributionTokenAmount, contributionTokenAddress, _activate);
@@ -146,6 +154,7 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
         // make sure there's no ETH left
         uint256 ethBalance = address(this).balance;
         if (ethBalance > 0) {
+            // solium-disable security/no-call-value
             (bool result,) = msg.sender.call.value(ethBalance)("");
             require(result, ERROR_ETH_REFUND);
         }
@@ -159,8 +168,10 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
         presale.contribute(address(this), _amount);
         uint256 bondedTokensObtained = presale.contributionToTokens(_amount);
 
+        // approve to registry
+        require(bondedToken.safeApprove(address(registry), bondedTokensObtained), ERROR_TOKEN_APPROVAL_FAILED);
+
         // activate in registry
-        bondedToken.approve(address(registry), bondedTokensObtained);
         bytes memory data;
         if (_activate) {
             data = abi.encodePacked(ACTIVATE_DATA);
