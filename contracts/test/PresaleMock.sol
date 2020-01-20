@@ -19,6 +19,7 @@ contract PresaleMock is IPresale {
     ERC20Mock public bondedToken;
     uint256 public exchangeRate;
     uint256 public totalRaised;
+    bool public isClosed;
 
     event Contribute (address indexed contributor, uint256 value, uint256 amount);
 
@@ -32,6 +33,7 @@ contract PresaleMock is IPresale {
     }
 
     function close() external {
+        isClosed = true;
     }
 
     function contribute(address _contributor, uint256 _value) external payable {

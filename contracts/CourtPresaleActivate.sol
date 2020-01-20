@@ -56,21 +56,11 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
     * @param _data If non-empty it will signal token activation in the registry
     */
     function receiveApproval(address _from, uint256 _amount, address _token, bytes calldata _data) external {
-        require(_amount > 0, ERROR_ZERO_AMOUNT);
-        require(_token == address(presale.contributionToken()), ERROR_WRONG_TOKEN);
-
-        // move tokens to this contract
-        ERC20 token = ERC20(_token);
-        require(token.safeTransferFrom(_from, address(this), _amount), ERROR_TOKEN_TRANSFER_FAILED);
-
-        bool activate;
-        if (_data.length > 0) {
-            activate = true;
+        if (!presale.isClosed()) {
+            _receiveApprovalPresale(_from, _amount, _token, _data);
+        } else {
+            _receiveApprovalBondingCurve(_from, _amount, _token, _data);
         }
-        _buyAndActivate(_from, _amount, _token, activate);
-
-        // refund leftovers if any
-        _refund(token);
     }
 
     /**
@@ -86,8 +76,8 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
     * @param _activate Signal activation of tokens in the registry
     */
     function contributeExternalToken(
-        address _token,
         uint256 _amount,
+        address _token,
         uint256 _minTokens,
         uint256 _minEth,
         uint256 _deadline,
@@ -95,28 +85,11 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
     )
         external
     {
-        require(_amount > 0, ERROR_ZERO_AMOUNT);
-
-        // move tokens to this contract
-        require(ERC20(_token).safeTransferFrom(msg.sender, address(this), _amount), ERROR_TOKEN_TRANSFER_FAILED);
-
-        // get the Uniswap exchange for the contribution token
-        address payable uniswapExchangeAddress = uniswapFactory.getExchange(_token);
-        require(uniswapExchangeAddress != address(0), ERROR_UNISWAP_UNAVAILABLE);
-        IUniswapExchange uniswapExchange = IUniswapExchange(uniswapExchangeAddress);
-
-        // swap tokens
-        address contributionTokenAddress = address(presale.contributionToken());
-        ERC20 token = ERC20(_token);
-        require(token.safeApprove(address(uniswapExchange), _amount), ERROR_TOKEN_APPROVAL_FAILED);
-        uint256 contributionTokenAmount = uniswapExchange.tokenToTokenSwapInput(_amount, _minTokens, _minEth, _deadline, contributionTokenAddress);
-
-        // buy in presale
-        _buyAndActivate(msg.sender, contributionTokenAmount, contributionTokenAddress, _activate);
-
-        // refund leftovers if any
-        _refund(token);
-        _refund(contributionTokenAddress);
+        if (!presale.isClosed()) {
+            _contributeExternalTokenPresale(_amount, _token, _minTokens, _minEth, _deadline, _activate);
+        } else {
+            _contributeExternalTokenBondingCurve(msg.sender, _amount, _token, _minTokens, _minEth, _deadline, _activate);
+        }
     }
 
     /**
@@ -130,6 +103,127 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
     function contributeEth(uint256 _minTokens, uint256 _deadline, bool _activate) external payable {
         require(msg.value > 0, ERROR_ZERO_AMOUNT);
 
+        if (!presale.isClosed()) {
+            _contributeEthPresale(_minTokens, _deadline, _activate);
+        } else {
+            _contributeEthBondingCurve(_minTokens, _deadline, _activate);
+        }
+
+        // make sure there's no ETH left
+        uint256 ethBalance = address(this).balance;
+        if (ethBalance > 0) {
+            // solium-disable security/no-call-value
+            (bool result,) = msg.sender.call.value(ethBalance)("");
+            require(result, ERROR_ETH_REFUND);
+        }
+    }
+
+    function _receiveApprovalPresale(address _from, uint256 _amount, address _token, bytes memory _data) internal {
+        require(_amount > 0, ERROR_ZERO_AMOUNT);
+        require(_token == address(presale.contributionToken()), ERROR_WRONG_TOKEN);
+
+        bool activate;
+        if (_data.length > 0) {
+            activate = true;
+        }
+
+        // move tokens to this contract
+        ERC20 token = ERC20(_token);
+        require(token.safeTransferFrom(_from, address(this), _amount), ERROR_TOKEN_TRANSFER_FAILED);
+
+        _buyAndActivate(_from, _amount, _token, activate);
+
+        // refund leftovers if any
+        _refund(_token);
+    }
+
+    function _receiveApprovalBondingCurve(address _from, uint256 _amount, address _token, bytes memory _data) internal {
+        bool activate;
+        uint256 minTokens;
+        uint256 minEth;
+        uint256 deadline;
+        assembly {
+            activate := mload(add(_data, 0x20))
+            minTokens := mload(add(_data, 0x40))
+            minEth := mload(add(_data, 0x60))
+            deadline := mload(add(_data, 0x80))
+        }
+
+        _contributeExternalTokenBondingCurve(_from, _amount, _token, minTokens, minEth, deadline, activate);
+    }
+
+    function _setupUniswapExchange(address _from, uint256 _amount, address _token) internal returns (IUniswapExchange) {
+        require(_amount > 0, ERROR_ZERO_AMOUNT);
+
+        // move tokens to this contract
+        ERC20 token = ERC20(_token);
+        require(token.safeTransferFrom(_from, address(this), _amount), ERROR_TOKEN_TRANSFER_FAILED);
+
+        // get the Uniswap exchange for the external token
+        address payable uniswapExchangeAddress = uniswapFactory.getExchange(_token);
+        require(uniswapExchangeAddress != address(0), ERROR_UNISWAP_UNAVAILABLE);
+        IUniswapExchange uniswapExchange = IUniswapExchange(uniswapExchangeAddress);
+
+        require(token.safeApprove(address(uniswapExchange), _amount), ERROR_TOKEN_APPROVAL_FAILED);
+
+        return uniswapExchange;
+    }
+
+    function _contributeExternalTokenPresale(
+        uint256 _amount,
+        address _token,
+        uint256 _minTokens,
+        uint256 _minEth,
+        uint256 _deadline,
+        bool _activate
+    )
+        internal
+    {
+        IUniswapExchange uniswapExchange = _setupUniswapExchange(msg.sender, _amount, _token);
+
+        // swap tokens
+        address contributionTokenAddress = address(presale.contributionToken());
+        uint256 contributionTokenAmount = uniswapExchange.tokenToTokenSwapInput(
+            _amount,
+            _minTokens,
+            _minEth,
+            _deadline,
+            contributionTokenAddress
+        );
+
+        // buy in presale
+        _buyAndActivate(msg.sender, contributionTokenAmount, contributionTokenAddress, _activate);
+
+        // refund leftovers if any
+        _refund(_token);
+        _refund(contributionTokenAddress);
+    }
+
+    function _contributeExternalTokenBondingCurve(
+        address _from,
+        uint256 _amount,
+        address _token,
+        uint256 _minTokens,
+        uint256 _minEth,
+        uint256 _deadline,
+        bool _activate
+    )
+        internal
+    {
+        IUniswapExchange uniswapExchange = _setupUniswapExchange(_from, _amount, _token);
+
+        // swap tokens
+        uint256 bondedTokenAmount = uniswapExchange.tokenToTokenSwapInput(_amount, _minTokens, _minEth, _deadline, address(bondedToken));
+
+        // buy in presale
+        _stakeAndActivate(_from, bondedTokenAmount, _activate);
+
+        // refund leftovers if any
+        _refund(_token);
+        _refund(bondedToken);
+    }
+
+    function _contributeEthPresale(uint256 _minTokens, uint256 _deadline, bool _activate) internal {
         address contributionTokenAddress = address(presale.contributionToken());
 
         // get the Uniswap exchange for the contribution token
@@ -142,13 +236,19 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
 
         // buy in presale
         _buyAndActivate(msg.sender, contributionTokenAmount, contributionTokenAddress, _activate);
+    }
 
-        // make sure there's no ETH left
-        uint256 ethBalance = address(this).balance;
-        if (ethBalance > 0) {
-            (bool result,) = msg.sender.call.value(ethBalance)("");
-            require(result, ERROR_ETH_REFUND);
-        }
+    function _contributeEthBondingCurve(uint256 _minTokens, uint256 _deadline, bool _activate) internal {
+        // get the Uniswap exchange for the bonded token
+        address payable uniswapExchangeAddress = uniswapFactory.getExchange(address(bondedToken));
+        require(uniswapExchangeAddress != address(0), ERROR_UNISWAP_UNAVAILABLE);
+        IUniswapExchange uniswapExchange = IUniswapExchange(uniswapExchangeAddress);
+
+        // swap tokens
+        uint256 bondedTokenAmount = uniswapExchange.ethToTokenSwapInput.value(msg.value)(_minTokens, _deadline);
+
+        // buy in presale
+        _stakeAndActivate(msg.sender, bondedTokenAmount, _activate);
     }
 
     function _buyAndActivate(address _from, uint256 _amount, address _token, bool _activate) internal {
@@ -159,18 +259,22 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
         presale.contribute(address(this), _amount);
         uint256 bondedTokensObtained = presale.contributionToTokens(_amount);
 
+        _stakeAndActivate(_from, bondedTokensObtained, _activate);
+
+        emit BoughtAndActivated(_from, _token, _amount, bondedTokensObtained);
+    }
+
+    function _stakeAndActivate(address _from, uint256 _amount, bool _activate) internal {
         // activate in registry
-        bondedToken.approve(address(registry), bondedTokensObtained);
+        bondedToken.approve(address(registry), _amount);
         bytes memory data;
         if (_activate) {
             data = abi.encodePacked(ACTIVATE_DATA);
         }
-        registry.stakeFor(_from, bondedTokensObtained, data);
+        registry.stakeFor(_from, _amount, data);
 
         // refund leftovers if any
         _refund(bondedToken);
-
-        emit BoughtAndActivated(_from, _token, _amount, bondedTokensObtained);
     }
 
     function _refund(address _tokenAddress) internal {
