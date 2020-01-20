@@ -53,8 +53,9 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
     * @param _from Address of the original caller (juror) converting and activating the tokens
     * @param _amount Amount of contribution tokens to be converted and activated
     * @param _token Address of the contribution token triggering the approve-and-call fallback
+    * @param _data If non-empty it will signal token activation in the registry
     */
-    function receiveApproval(address _from, uint256 _amount, address _token, bytes calldata) external {
+    function receiveApproval(address _from, uint256 _amount, address _token, bytes calldata _data) external {
         require(_amount > 0, ERROR_ZERO_AMOUNT);
         require(_token == address(presale.contributionToken()), ERROR_WRONG_TOKEN);
 
@@ -62,7 +63,11 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
         ERC20 token = ERC20(_token);
         require(token.safeTransferFrom(_from, address(this), _amount), ERROR_TOKEN_TRANSFER_FAILED);
 
-        _buyAndActivate(_from, _amount, _token);
+        bool activate;
+        if (_data.length > 0) {
+            activate = true;
+        }
+        _buyAndActivate(_from, _amount, _token, activate);
 
         // refund leftovers if any
         _refund(token);
@@ -78,13 +83,15 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
     * @param _minTokens Minimum amount of presale contribution tokens obtained in Uniswap
     * @param _minEth Minimum amount of ETH obtained in Uniswap (Uniswap internally converts first to ETH and then to target token)
     * @param _deadline Transaction deadline for Uniswap
+    * @param _activate Signal activation of tokens in the registry
     */
     function contributeExternalToken(
         address _token,
         uint256 _amount,
         uint256 _minTokens,
         uint256 _minEth,
-        uint256 _deadline
+        uint256 _deadline,
+        bool _activate
     )
         external
     {
@@ -105,7 +112,7 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
         uint256 contributionTokenAmount = uniswapExchange.tokenToTokenSwapInput(_amount, _minTokens, _minEth, _deadline, contributionTokenAddress);
 
         // buy in presale
-        _buyAndActivate(msg.sender, contributionTokenAmount, contributionTokenAddress);
+        _buyAndActivate(msg.sender, contributionTokenAmount, contributionTokenAddress, _activate);
 
         // refund leftovers if any
         _refund(token);
@@ -118,8 +125,9 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
     *      jurors registry instance of the Aragon Court.
     * @param _minTokens Minimum amount of presale contribution tokens obtained in Uniswap
     * @param _deadline Transaction deadline for Uniswap
+    * @param _activate Signal activation of tokens in the registry
     */
-    function contributeEth(uint256 _minTokens, uint256 _deadline) external payable {
+    function contributeEth(uint256 _minTokens, uint256 _deadline, bool _activate) external payable {
         require(msg.value > 0, ERROR_ZERO_AMOUNT);
 
         address contributionTokenAddress = address(presale.contributionToken());
@@ -133,7 +141,7 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
         uint256 contributionTokenAmount = uniswapExchange.ethToTokenSwapInput.value(msg.value)(_minTokens, _deadline);
 
         // buy in presale
-        _buyAndActivate(msg.sender, contributionTokenAmount, contributionTokenAddress);
+        _buyAndActivate(msg.sender, contributionTokenAmount, contributionTokenAddress, _activate);
 
         // make sure there's no ETH left
         uint256 ethBalance = address(this).balance;
@@ -143,7 +151,7 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
         }
     }
 
-    function _buyAndActivate(address _from, uint256 _amount, address _token) internal {
+    function _buyAndActivate(address _from, uint256 _amount, address _token, bool _activate) internal {
         // approve to presale
         require(ERC20(_token).safeApprove(address(presale), _amount), ERROR_TOKEN_APPROVAL_FAILED);
 
@@ -153,7 +161,11 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
 
         // activate in registry
         bondedToken.approve(address(registry), bondedTokensObtained);
-        registry.stakeFor(_from, bondedTokensObtained, abi.encodePacked(ACTIVATE_DATA));
+        bytes memory data;
+        if (_activate) {
+            data = abi.encodePacked(ACTIVATE_DATA);
+        }
+        registry.stakeFor(_from, bondedTokensObtained, data);
 
         // refund leftovers if any
         _refund(bondedToken);
