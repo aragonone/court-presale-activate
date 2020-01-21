@@ -12,7 +12,7 @@ const ERC20 = artifacts.require('ERC20Mock')
 const ERC20Bad = artifacts.require('ERC20BadMock')
 const UniswapFactory = artifacts.require('UniswapFactory')
 const UniswapExchange = artifacts.require('UniswapExchange')
-const UniswapWrapper = artifacts.require('CourtPresaleActivate')
+const UniswapWrapper = artifacts.require('RegistryBuyAndStakeWrapper')
 
 const getDeadline = async () => bn((await getBlock(await getBlockNumber())).timestamp).add(bn(86400))
 
@@ -20,13 +20,13 @@ const getDeadline = async () => bn((await getBlock(await getBlockNumber())).time
 contract('Court Uniswap wrapper', ([_, owner, provider, juror1]) => {
   const ZERO_ADDRESS = '0x' + '0'.repeat(40)
 
-  const ERROR_TOKEN_NOT_CONTRACT = 'CPA_TOKEN_NOT_CONTRACT'
-  const ERROR_REGISTRY_NOT_CONTRACT = 'CPA_REGISTRY_NOT_CONTRACT'
-  const ERROR_UNISWAP_FACTORY_NOT_CONTRACT = 'CPA_UNISWAP_FACTORY_NOT_CONTRACT'
-  const ERROR_ZERO_AMOUNT = 'CPA_ZERO_AMOUNT'
-  const ERROR_TOKEN_TRANSFER_FAILED = 'CPA_TOKEN_TRANSFER_FAILED'
-  const ERROR_TOKEN_APPROVAL_FAILED = 'CPA_TOKEN_APPROVAL_FAILED'
-  const ERROR_UNISWAP_UNAVAILABLE = 'CPA_UNISWAP_UNAVAILABLE'
+  const ERROR_TOKEN_NOT_CONTRACT = 'RBSW_TOKEN_NOT_CONTRACT'
+  const ERROR_REGISTRY_NOT_CONTRACT = 'RBSW_REGISTRY_NOT_CONTRACT'
+  const ERROR_UNISWAP_FACTORY_NOT_CONTRACT = 'RBSW_UNISWAP_FACTORY_NOT_CONTRACT'
+  const ERROR_ZERO_AMOUNT = 'RBSW_ZERO_AMOUNT'
+  const ERROR_TOKEN_TRANSFER_FAILED = 'RBSW_TOKEN_TRANSFER_FAILED'
+  const ERROR_TOKEN_APPROVAL_FAILED = 'RBSW_TOKEN_APPROVAL_FAILED'
+  const ERROR_UNISWAP_UNAVAILABLE = 'RBSW_UNISWAP_UNAVAILABLE'
 
   const INITIAL_BIG_TOKEN_AMOUNT = bigExp(1, 24)
   const exchangeRate = bn(200000)

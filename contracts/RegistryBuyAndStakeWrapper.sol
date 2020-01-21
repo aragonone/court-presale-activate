@@ -10,20 +10,20 @@ import "./lib/uniswap/interfaces/IUniswapExchange.sol";
 import "./lib/uniswap/interfaces/IUniswapFactory.sol";
 
 
-contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
+contract RegistryBuyAndStakeWrapper is IsContract, ApproveAndCallFallBack {
     using SafeERC20 for ERC20;
 
-    string private constant ERROR_TOKEN_NOT_CONTRACT = "CPA_TOKEN_NOT_CONTRACT";
-    string private constant ERROR_REGISTRY_NOT_CONTRACT = "CPA_REGISTRY_NOT_CONTRACT";
-    string private constant ERROR_PRESALE_NOT_CONTRACT = "CPA_PRESALE_NOT_CONTRACT";
-    string private constant ERROR_UNISWAP_FACTORY_NOT_CONTRACT = "CPA_UNISWAP_FACTORY_NOT_CONTRACT";
-    string private constant ERROR_ZERO_AMOUNT = "CPA_ZERO_AMOUNT";
-    string private constant ERROR_TOKEN_TRANSFER_FAILED = "CPA_TOKEN_TRANSFER_FAILED";
-    string private constant ERROR_TOKEN_APPROVAL_FAILED = "CPA_TOKEN_APPROVAL_FAILED";
-    string private constant ERROR_WRONG_TOKEN = "CPA_WRONG_TOKEN";
-    string private constant ERROR_ETH_REFUND = "CPA_ETH_REFUND";
-    string private constant ERROR_TOKEN_REFUND = "CPA_TOKEN_REFUND";
-    string private constant ERROR_UNISWAP_UNAVAILABLE = "CPA_UNISWAP_UNAVAILABLE";
+    string private constant ERROR_TOKEN_NOT_CONTRACT = "RBSW_TOKEN_NOT_CONTRACT";
+    string private constant ERROR_REGISTRY_NOT_CONTRACT = "RBSW_REGISTRY_NOT_CONTRACT";
+    string private constant ERROR_PRESALE_NOT_CONTRACT = "RBSW_PRESALE_NOT_CONTRACT";
+    string private constant ERROR_UNISWAP_FACTORY_NOT_CONTRACT = "RBSW_UNISWAP_FACTORY_NOT_CONTRACT";
+    string private constant ERROR_ZERO_AMOUNT = "RBSW_ZERO_AMOUNT";
+    string private constant ERROR_TOKEN_TRANSFER_FAILED = "RBSW_TOKEN_TRANSFER_FAILED";
+    string private constant ERROR_TOKEN_APPROVAL_FAILED = "RBSW_TOKEN_APPROVAL_FAILED";
+    string private constant ERROR_WRONG_TOKEN = "RBSW_WRONG_TOKEN";
+    string private constant ERROR_ETH_REFUND = "RBSW_ETH_REFUND";
+    string private constant ERROR_TOKEN_REFUND = "RBSW_TOKEN_REFUND";
+    string private constant ERROR_UNISWAP_UNAVAILABLE = "RBSW_UNISWAP_UNAVAILABLE";
 
     bytes32 internal constant ACTIVATE_DATA = keccak256("activate(uint256)");
 
