@@ -1,10 +1,14 @@
 pragma solidity ^0.5.0;
 import "../tokens/ERC20.sol";
 import "../interfaces/IERC20.sol";
-import "../interfaces/IUniswapFactory.sol";
-import "../interfaces/IUniswapExchange.sol";
+import "../../../lib/uniswap/interfaces/IUniswapFactory.sol";
+import "../../../lib/uniswap/interfaces/IUniswapExchange.sol";
 
 
+/**
+ * From here:
+ * https://github.com/PhABC/uniswap-solidity
+ */
 contract UniswapExchange is ERC20 {
 
   /***********************************|
