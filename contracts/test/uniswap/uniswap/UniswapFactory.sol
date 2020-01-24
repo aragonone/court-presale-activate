@@ -1,9 +1,13 @@
 pragma solidity ^0.5.0;
 
 import "./UniswapExchange.sol";
-import "../interfaces/IUniswapExchange.sol";
+import "../../../lib/uniswap/interfaces/IUniswapExchange.sol";
 
 
+/**
+ * From here:
+ * https://github.com/PhABC/uniswap-solidity
+ */
 contract UniswapFactory {
 
   /***********************************|
