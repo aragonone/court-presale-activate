@@ -62,7 +62,7 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
         ERC20 token = ERC20(_token);
         require(token.safeTransferFrom(_from, address(this), _amount), ERROR_TOKEN_TRANSFER_FAILED);
 
-        _buyAndActivate(_from, _amount, _token);
+        _buyAndActivate(_from, _amount, token);
 
         // refund leftovers if any
         _refund(token);
@@ -99,17 +99,17 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
         IUniswapExchange uniswapExchange = IUniswapExchange(uniswapExchangeAddress);
 
         // swap tokens
-        address contributionTokenAddress = address(presale.contributionToken());
+        ERC20 contributionToken = presale.contributionToken();
         ERC20 token = ERC20(_token);
         require(token.safeApprove(address(uniswapExchange), _amount), ERROR_TOKEN_APPROVAL_FAILED);
-        uint256 contributionTokenAmount = uniswapExchange.tokenToTokenSwapInput(_amount, _minTokens, _minEth, _deadline, contributionTokenAddress);
+        uint256 contributionTokenAmount = uniswapExchange.tokenToTokenSwapInput(_amount, _minTokens, _minEth, _deadline, address(contributionToken));
 
         // buy in presale
-        _buyAndActivate(msg.sender, contributionTokenAmount, contributionTokenAddress);
+        _buyAndActivate(msg.sender, contributionTokenAmount, contributionToken);
 
         // refund leftovers if any
         _refund(token);
-        _refund(contributionTokenAddress);
+        _refund(contributionToken);
     }
 
     /**
@@ -122,10 +122,10 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
     function contributeEth(uint256 _minTokens, uint256 _deadline) external payable {
         require(msg.value > 0, ERROR_ZERO_AMOUNT);
 
-        address contributionTokenAddress = address(presale.contributionToken());
+        ERC20 contributionToken = presale.contributionToken();
 
         // get the Uniswap exchange for the contribution token
-        address payable uniswapExchangeAddress = uniswapFactory.getExchange(contributionTokenAddress);
+        address payable uniswapExchangeAddress = uniswapFactory.getExchange(address(contributionToken));
         require(uniswapExchangeAddress != address(0), ERROR_UNISWAP_UNAVAILABLE);
         IUniswapExchange uniswapExchange = IUniswapExchange(uniswapExchangeAddress);
 
@@ -133,7 +133,7 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
         uint256 contributionTokenAmount = uniswapExchange.ethToTokenSwapInput.value(msg.value)(_minTokens, _deadline);
 
         // buy in presale
-        _buyAndActivate(msg.sender, contributionTokenAmount, contributionTokenAddress);
+        _buyAndActivate(msg.sender, contributionTokenAmount, contributionToken);
 
         // make sure there's no ETH left
         uint256 ethBalance = address(this).balance;
@@ -143,9 +143,9 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
         }
     }
 
-    function _buyAndActivate(address _from, uint256 _amount, address _token) internal {
+    function _buyAndActivate(address _from, uint256 _amount, ERC20 _token) internal {
         // approve to presale
-        require(ERC20(_token).safeApprove(address(presale), _amount), ERROR_TOKEN_APPROVAL_FAILED);
+        require(_token.safeApprove(address(presale), _amount), ERROR_TOKEN_APPROVAL_FAILED);
 
         // buy in presale
         presale.contribute(address(this), _amount);
@@ -158,12 +158,7 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
         // refund leftovers if any
         _refund(bondedToken);
 
-        emit BoughtAndActivated(_from, _token, _amount, bondedTokensObtained);
-    }
-
-    function _refund(address _tokenAddress) internal {
-        ERC20 token = ERC20(_tokenAddress);
-        _refund(token);
+        emit BoughtAndActivated(_from, address(_token), _amount, bondedTokensObtained);
     }
 
     function _refund(ERC20 _token) internal {
