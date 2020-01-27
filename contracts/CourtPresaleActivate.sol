@@ -124,20 +124,7 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
     * @param _deadline Transaction deadline for Uniswap
     */
     function contributeEth(uint256 _minTokens, uint256 _deadline) external payable {
-        require(msg.value > 0, ERROR_ZERO_AMOUNT);
-
-        ERC20 contributionToken = presale.contributionToken();
-
-        // get the Uniswap exchange for the contribution token
-        address payable uniswapExchangeAddress = uniswapFactory.getExchange(address(contributionToken));
-        require(uniswapExchangeAddress != address(0), ERROR_UNISWAP_UNAVAILABLE);
-        IUniswapExchange uniswapExchange = IUniswapExchange(uniswapExchangeAddress);
-
-        // swap tokens
-        uint256 contributionTokenAmount = uniswapExchange.ethToTokenSwapInput.value(msg.value)(_minTokens, _deadline);
-
-        // buy in presale
-        _buyAndActivate(msg.sender, contributionTokenAmount, contributionToken);
+        _contributeEth(_minTokens, _deadline);
     }
 
     /**
@@ -166,6 +153,32 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
         require(selfBalance >= _amount, ERROR_NOT_ENOUGH_BALANCE);
 
         require(_token.safeTransfer(_recipient, _amount), ERROR_TOKEN_REFUND);
+    }
+
+    /**
+    * @notice Convert ETH to tokens and activate them in the Registry.
+    * @dev User specifies exact input (msg.value).
+    * @dev User cannot specify minimum output or deadline.
+    */
+    function () external payable {
+        _contributeEth(1, block.timestamp);
+    }
+
+    function _contributeEth(uint256 _minTokens, uint256 _deadline) internal {
+        require(msg.value > 0, ERROR_ZERO_AMOUNT);
+
+        ERC20 contributionToken = presale.contributionToken();
+
+        // get the Uniswap exchange for the contribution token
+        address payable uniswapExchangeAddress = uniswapFactory.getExchange(address(contributionToken));
+        require(uniswapExchangeAddress != address(0), ERROR_UNISWAP_UNAVAILABLE);
+        IUniswapExchange uniswapExchange = IUniswapExchange(uniswapExchangeAddress);
+
+        // swap tokens
+        uint256 contributionTokenAmount = uniswapExchange.ethToTokenSwapInput.value(msg.value)(_minTokens, _deadline);
+
+        // buy in presale
+        _buyAndActivate(msg.sender, contributionTokenAmount, contributionToken);
     }
 
     function _buyAndActivate(address _from, uint256 _amount, ERC20 _token) internal {
