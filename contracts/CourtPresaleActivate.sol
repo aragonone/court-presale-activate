@@ -94,6 +94,9 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
     )
         external
     {
+        ERC20 contributionToken = presale.contributionToken();
+        address contributionTokenAddress = address(contributionToken);
+        require(_token != contributionTokenAddress, ERROR_WRONG_TOKEN);
         require(_amount > 0, ERROR_ZERO_AMOUNT);
 
         // move tokens to this contract
@@ -105,10 +108,9 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
         IUniswapExchange uniswapExchange = IUniswapExchange(uniswapExchangeAddress);
 
         // swap tokens
-        ERC20 contributionToken = presale.contributionToken();
         ERC20 token = ERC20(_token);
         require(token.safeApprove(address(uniswapExchange), _amount), ERROR_TOKEN_APPROVAL_FAILED);
-        uint256 contributionTokenAmount = uniswapExchange.tokenToTokenSwapInput(_amount, _minTokens, _minEth, _deadline, address(contributionToken));
+        uint256 contributionTokenAmount = uniswapExchange.tokenToTokenSwapInput(_amount, _minTokens, _minEth, _deadline, contributionTokenAddress);
 
         // buy in presale
         _buyAndActivate(msg.sender, contributionTokenAmount, contributionToken);
