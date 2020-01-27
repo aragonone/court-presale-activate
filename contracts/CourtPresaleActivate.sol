@@ -13,6 +13,7 @@ import "./lib/uniswap/interfaces/IUniswapFactory.sol";
 contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
     using SafeERC20 for ERC20;
 
+    string private constant ERROR_NOT_GOVERNOR = "CPA_NOT_GOVERNOR";
     string private constant ERROR_TOKEN_NOT_CONTRACT = "CPA_TOKEN_NOT_CONTRACT";
     string private constant ERROR_REGISTRY_NOT_CONTRACT = "CPA_REGISTRY_NOT_CONTRACT";
     string private constant ERROR_PRESALE_NOT_CONTRACT = "CPA_PRESALE_NOT_CONTRACT";
@@ -24,9 +25,11 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
     string private constant ERROR_ETH_REFUND = "CPA_ETH_REFUND";
     string private constant ERROR_TOKEN_REFUND = "CPA_TOKEN_REFUND";
     string private constant ERROR_UNISWAP_UNAVAILABLE = "CPA_UNISWAP_UNAVAILABLE";
+    string private constant ERROR_NOT_ENOUGH_BALANCE = "CPA_NOT_ENOUGH_BALANCE";
 
     bytes32 internal constant ACTIVATE_DATA = keccak256("activate(uint256)");
 
+    address public governor;
     ERC20 public bondedToken;
     ERC900 public registry;
     IPresale public presale;
@@ -34,12 +37,18 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
 
     event BoughtAndActivated(address from, address collateralToken, uint256 buyAmount, uint256 activatedAmount);
 
-    constructor(ERC20 _bondedToken, ERC900 _registry, IPresale _presale, IUniswapFactory _uniswapFactory) public {
+    modifier onlyGovernor() {
+        require(msg.sender == governor, ERROR_NOT_GOVERNOR);
+        _;
+    }
+
+    constructor(address _governor, ERC20 _bondedToken, ERC900 _registry, IPresale _presale, IUniswapFactory _uniswapFactory) public {
         require(isContract(address(_bondedToken)), ERROR_TOKEN_NOT_CONTRACT);
         require(isContract(address(_registry)), ERROR_REGISTRY_NOT_CONTRACT);
         require(isContract(address(_presale)), ERROR_PRESALE_NOT_CONTRACT);
         require(isContract(address(_uniswapFactory)), ERROR_UNISWAP_FACTORY_NOT_CONTRACT);
 
+        governor = _governor;
         bondedToken = _bondedToken;
         registry = _registry;
         presale = _presale;
@@ -63,9 +72,6 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
         require(token.safeTransferFrom(_from, address(this), _amount), ERROR_TOKEN_TRANSFER_FAILED);
 
         _buyAndActivate(_from, _amount, token);
-
-        // refund leftovers if any
-        _refund(token);
     }
 
     /**
@@ -106,10 +112,6 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
 
         // buy in presale
         _buyAndActivate(msg.sender, contributionTokenAmount, contributionToken);
-
-        // refund leftovers if any
-        _refund(token);
-        _refund(contributionToken);
     }
 
     /**
@@ -134,13 +136,34 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
 
         // buy in presale
         _buyAndActivate(msg.sender, contributionTokenAmount, contributionToken);
+    }
 
-        // make sure there's no ETH left
-        uint256 ethBalance = address(this).balance;
-        if (ethBalance > 0) {
-            (bool result,) = msg.sender.call.value(ethBalance)("");
-            require(result, ERROR_ETH_REFUND);
-        }
+    /**
+    * @notice Refunds accidentally sent ETH. Only governor can do it
+    * @param _recipient Address to send funds to
+    * @param _amount Amount to be refunded
+    */
+    function refundEth(address payable _recipient, uint256 _amount) external onlyGovernor {
+        require(_amount > 0, ERROR_ZERO_AMOUNT);
+        uint256 selfBalance = address(this).balance;
+        require(selfBalance >= _amount, ERROR_NOT_ENOUGH_BALANCE);
+
+        (bool result,) = _recipient.call.value(_amount)("");
+        require(result, ERROR_ETH_REFUND);
+    }
+
+    /**
+    * @notice Refunds accidentally sent ERC20 tokens. Only governor can do it
+    * @param _token Token to be refunded
+    * @param _recipient Address to send funds to
+    * @param _amount Amount to be refunded
+    */
+    function refundToken(ERC20 _token, address _recipient, uint256 _amount) external onlyGovernor {
+        require(_amount > 0, ERROR_ZERO_AMOUNT);
+        uint256 selfBalance = _token.balanceOf(address(this));
+        require(selfBalance >= _amount, ERROR_NOT_ENOUGH_BALANCE);
+
+        require(_token.safeTransfer(_recipient, _amount), ERROR_TOKEN_REFUND);
     }
 
     function _buyAndActivate(address _from, uint256 _amount, ERC20 _token) internal {
@@ -155,16 +178,6 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
         bondedToken.approve(address(registry), bondedTokensObtained);
         registry.stakeFor(_from, bondedTokensObtained, abi.encodePacked(ACTIVATE_DATA));
 
-        // refund leftovers if any
-        _refund(bondedToken);
-
         emit BoughtAndActivated(_from, address(_token), _amount, bondedTokensObtained);
-    }
-
-    function _refund(ERC20 _token) internal {
-        uint256 selfBalance = _token.balanceOf(address(this));
-        if (selfBalance > 0) {
-            require(_token.safeTransfer(msg.sender, selfBalance), ERROR_TOKEN_REFUND);
-        }
     }
 }
