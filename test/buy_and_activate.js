@@ -146,6 +146,13 @@ contract('Court presale and activate wrapper', ([_, owner, provider, juror1]) =>
             await assertRevert(cpa.contributeExternalToken(externalToken.address, 0, 1, 1, 0, { from: juror1 }), ERROR_ZERO_AMOUNT)
           })
 
+          it('fails when external token is the same as collateral token', async () => {
+            const externalAmount = bigExp(1, 21)
+            const ethAmount = await uniswapExternalExchange.getTokenToEthInputPrice(externalAmount)
+            const collateralAmount = await uniswapCollateralExchange.getEthToTokenInputPrice(ethAmount)
+            await assertRevert(cpa.contributeExternalToken(collateralToken.address, collateralAmount, 1, 1, 0, { from: juror1 }), ERROR_WRONG_TOKEN)
+          })
+
           it('buys, stakes and activates', async () => {
             const externalAmount = bigExp(1, 21)
             const ethAmount = await uniswapExternalExchange.getTokenToEthInputPrice(externalAmount)
