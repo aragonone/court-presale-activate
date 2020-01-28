@@ -81,7 +81,7 @@ contract('Court presale and activate wrapper', ([_, owner, provider, juror1]) =>
           await assertRevert(collateralToken.approveAndCall(cpa.address, 0, activateData), ERROR_ZERO_AMOUNT)
         })
 
-        it('buys, stakes' + activateDescription + ', using ApproveAndCall fallback', async () => {
+        it(`buys, stakes${activateDescription}, using ApproveAndCall fallback`, async () => {
           const amount = DEFAULTS.minActiveBalance.mul(PPM).div(exchangeRate)
           const initialActiveAmount = (await registry.balanceOf(juror1))[0]
           const bondedTokensToGet = await presale.contributionToTokens(amount)
@@ -93,7 +93,7 @@ contract('Court presale and activate wrapper', ([_, owner, provider, juror1]) =>
           assertBn(finalActiveAmount, expectedActiveAmount, `Active balance `)
         })
 
-        it('buys, stakes' + activateDescription + ', in two transactions', async () => {
+        it(`buys, stakes${activateDescription}, in two transactions`, async () => {
           const amount = DEFAULTS.minActiveBalance.mul(PPM).div(exchangeRate)
           const initialActiveAmount = (await registry.balanceOf(juror1))[0]
           const bondedTokensToGet = await presale.contributionToTokens(amount)
@@ -156,7 +156,7 @@ contract('Court presale and activate wrapper', ([_, owner, provider, juror1]) =>
             await assertRevert(cpa.contributeExternalToken(collateralToken.address, collateralAmount, 1, 1, 0, { from: juror1 }), ERROR_WRONG_TOKEN)
           })
 
-          it('buys, stakes' + activateDescription, async () => {
+          it(`buys, stakes${activateDescription}`, async () => {
             const externalAmount = bigExp(1, 21)
             const ethAmount = await uniswapExternalExchange.getTokenToEthInputPrice(externalAmount)
             const collateralAmount = await uniswapCollateralExchange.getEthToTokenInputPrice(ethAmount)
@@ -182,7 +182,7 @@ contract('Court presale and activate wrapper', ([_, owner, provider, juror1]) =>
             await assertRevert(cpa.contributeEth(1, 0, activate, { from: juror1, value: 0 }), ERROR_ZERO_AMOUNT)
           })
 
-          it('buys, stakes' + activateDescription, async () => {
+          it(`buys, stakes${activateDescription}`, async () => {
             const ethAmount = bigExp(1, 16)
             const collateralAmount = await uniswapCollateralExchange.getEthToTokenInputPrice(ethAmount)
             const initialActiveAmount = (await registry.balanceOf(juror1))[0]
@@ -198,16 +198,17 @@ contract('Court presale and activate wrapper', ([_, owner, provider, juror1]) =>
             assert.equal((await bondedToken.balanceOf(cpa.address)).toNumber(), 0, 'Wrapper bonded token balance should always be zero')
           })
 
-          it('buys, stakes and activates using fallback', async () => {
+          it(`buys, stakes${activateDescription} using fallback`, async () => {
             const ethAmount = bigExp(1, 16)
             const collateralAmount = await uniswapCollateralExchange.getEthToTokenInputPrice(ethAmount)
             const initialActiveAmount = (await registry.balanceOf(juror1))[0]
             const bondedTokensToGet = await presale.contributionToTokens(collateralAmount)
 
-            await cpa.sendTransaction({ from: juror1, value: ethAmount })
+            await cpa.sendTransaction({ from: juror1, value: ethAmount, data: activateData })
 
             const finalActiveAmount = (await registry.balanceOf(juror1))[0]
-            assertBn(finalActiveAmount, initialActiveAmount.add(bondedTokensToGet), `Active balance `)
+            const expectedActiveAmount = activate ? initialActiveAmount.add(bondedTokensToGet) : bn(0)
+            assertBn(finalActiveAmount, expectedActiveAmount, `Active balance `)
             assert.equal(await getBalance(cpa.address), '0', 'Wrapper ETH balance should always be zero')
             assert.equal((await collateralToken.balanceOf(cpa.address)).toNumber(), 0, 'Wrapper collateral token balance should always be zero')
             assert.equal((await bondedToken.balanceOf(cpa.address)).toNumber(), 0, 'Wrapper bonded token balance should always be zero')
