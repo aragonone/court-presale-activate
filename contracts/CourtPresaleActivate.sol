@@ -76,7 +76,7 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
         if (_data.length > 0) {
             activate = true;
         }
-        _buyAndActivate(_from, _amount, _token, activate);
+        _buyAndRegisterAsJuror(_from, _amount, token, activate);
     }
 
     /**
@@ -120,7 +120,7 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
         uint256 contributionTokenAmount = uniswapExchange.tokenToTokenSwapInput(_amount, _minTokens, _minEth, _deadline, contributionTokenAddress);
 
         // buy in presale
-        _buyAndActivate(msg.sender, contributionTokenAmount, contributionTokenAddress, _activate);
+        _buyAndRegisterAsJuror(msg.sender, contributionTokenAmount, contributionToken, _activate);
     }
 
     /**
@@ -169,10 +169,10 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
     * @dev User cannot specify minimum output or deadline.
     */
     function () external payable {
-        _contributeEth(1, block.timestamp);
+        _contributeEth(1, block.timestamp, true);
     }
 
-    function _contributeEth(uint256 _minTokens, uint256 _deadline) internal {
+    function _contributeEth(uint256 _minTokens, uint256 _deadline, bool _activate) internal {
         require(msg.value > 0, ERROR_ZERO_AMOUNT);
 
         ERC20 contributionToken = presale.contributionToken();
@@ -186,10 +186,10 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
         uint256 contributionTokenAmount = uniswapExchange.ethToTokenSwapInput.value(msg.value)(_minTokens, _deadline);
 
         // buy in presale
-        _buyAndActivate(msg.sender, contributionTokenAmount, contributionToken, _activate);
+        _buyAndRegisterAsJuror(msg.sender, contributionTokenAmount, contributionToken, _activate);
     }
 
-    function _buyAndActivate(address _from, uint256 _amount, ERC20 _token, bool _activate) internal {
+    function _buyAndRegisterAsJuror(address _from, uint256 _amount, ERC20 _token, bool _activate) internal {
         // approve to presale
         require(_token.safeApprove(address(presale), _amount), ERROR_TOKEN_APPROVAL_FAILED);
 
@@ -199,7 +199,7 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
 
         // activate in registry
         bondedToken.approve(address(registry), bondedTokensObtained);
-        bytes memory data;
+        bytes memory data = new bytes(0);
         if (_activate) {
             data = abi.encodePacked(ACTIVATE_DATA);
         }
