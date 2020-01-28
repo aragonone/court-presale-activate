@@ -72,7 +72,7 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
         ERC20 token = ERC20(_token);
         require(token.safeTransferFrom(_from, address(this), _amount), ERROR_TOKEN_TRANSFER_FAILED);
 
-        bool activate = _dataToBool(_data);
+        bool activate = _hasData(_data);
 
         _buyAndRegisterAsJuror(_from, _amount, token, activate);
     }
@@ -167,7 +167,7 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
     * @dev User cannot specify minimum output or deadline.
     */
     function () external payable {
-        _contributeEth(1, block.timestamp, _dataToBool(msg.data));
+        _contributeEth(1, block.timestamp, _hasData(msg.data));
     }
 
     function _contributeEth(uint256 _minTokens, uint256 _deadline, bool _activate) internal {
@@ -187,13 +187,8 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
         _buyAndRegisterAsJuror(msg.sender, contributionTokenAmount, contributionToken, _activate);
     }
 
-    function _dataToBool(bytes memory _data) internal pure returns(bool) {
-        bool activate;
-        if (_data.length > 0) {
-            activate = true;
-        }
-
-        return activate;
+    function _hasData(bytes memory _data) internal pure returns (bool) {
+        return _data.length > 0;
     }
 
     function _buyAndRegisterAsJuror(address _from, uint256 _amount, ERC20 _token, bool _activate) internal {
