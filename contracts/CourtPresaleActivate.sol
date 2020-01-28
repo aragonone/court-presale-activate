@@ -35,6 +35,8 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
     IPresale public presale;
     IUniswapFactory public uniswapFactory;
 
+    event BoughtAndRegistered(address from, address collateralToken, uint256 buyAmount, uint256 stakedAmount, bool activated);
+
     modifier onlyGovernor() {
         require(msg.sender == governor, ERROR_NOT_GOVERNOR);
         _;
@@ -209,5 +211,7 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
             data = abi.encodePacked(ACTIVATE_DATA);
         }
         registry.stakeFor(_from, bondedTokensObtained, data);
+
+        emit BoughtAndRegistered(_from, address(_token), _amount, bondedTokensObtained, _activate);
     }
 }
