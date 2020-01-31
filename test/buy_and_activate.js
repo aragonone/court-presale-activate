@@ -76,6 +76,24 @@ contract('Court presale and activate wrapper', ([_, owner, provider, juror1]) =>
         cpa = await CourtPresaleActivate.new(owner, bondedToken.address, registry.address, presale.address, uniswapFactory.address, { from: owner })
       })
 
+      const checkFinalBalances = async (amount, activate, initialActiveAmount) => {
+        const bondedTokensToGet = await presale.contributionToTokens(amount)
+        const finalActiveAmount = (await registry.balanceOf(juror1))[0]
+        const finalUserBalance = await bondedToken.balanceOf(juror1)
+        const finalExpectedAmount = initialActiveAmount.add(bondedTokensToGet)
+        let expectedActiveAmount
+        let expectedUserBalance
+        if (activate) {
+          expectedActiveAmount = finalExpectedAmount
+          expectedUserBalance = bn(0)
+        } else {
+          expectedActiveAmount = bn(0)
+          expectedUserBalance = finalExpectedAmount
+        }
+        assertBn(finalActiveAmount, expectedActiveAmount, `Active balance doesn't match`)
+        assertBn(finalUserBalance, expectedUserBalance, `User's balance doesn't match`)
+      }
+
       context('Bonded token', () => {
         it('fails when amount is zero', async () => {
           await assertRevert(collateralToken.approveAndCall(cpa.address, 0, activateData), ERROR_ZERO_AMOUNT)
@@ -84,26 +102,21 @@ contract('Court presale and activate wrapper', ([_, owner, provider, juror1]) =>
         it(`buys, stakes${activateDescription}, using ApproveAndCall fallback`, async () => {
           const amount = DEFAULTS.minActiveBalance.mul(PPM).div(exchangeRate)
           const initialActiveAmount = (await registry.balanceOf(juror1))[0]
-          const bondedTokensToGet = await presale.contributionToTokens(amount)
 
           await collateralToken.approveAndCall(cpa.address, amount, activateData, { from: juror1 })
 
-          const finalActiveAmount = (await registry.balanceOf(juror1))[0]
-          const expectedActiveAmount = activate ? initialActiveAmount.add(bondedTokensToGet) : bn(0)
-          assertBn(finalActiveAmount, expectedActiveAmount, `Active balance `)
+          await checkFinalBalances(amount, activate, initialActiveAmount)
         })
 
         it(`buys, stakes${activateDescription}, in two transactions`, async () => {
           const amount = DEFAULTS.minActiveBalance.mul(PPM).div(exchangeRate)
           const initialActiveAmount = (await registry.balanceOf(juror1))[0]
-          const bondedTokensToGet = await presale.contributionToTokens(amount)
 
           await collateralToken.approve(cpa.address, amount, { from: juror1 })
           await cpa.receiveApproval(juror1, amount, collateralToken.address, activateData, { from: juror1 })
 
-          const finalActiveAmount = (await registry.balanceOf(juror1))[0]
-          const expectedActiveAmount = activate ? initialActiveAmount.add(bondedTokensToGet) : bn(0)
-          assertBn(finalActiveAmount, expectedActiveAmount, `Active balance `)
+          await checkFinalBalances(amount, activate, initialActiveAmount)
+
           assert.equal((await collateralToken.balanceOf(cpa.address)).toNumber(), 0, 'Wrapper collateral token balance should always be zero')
           assert.equal((await bondedToken.balanceOf(cpa.address)).toNumber(), 0, 'Wrapper bonded token balance should always be zero')
         })
@@ -161,14 +174,12 @@ contract('Court presale and activate wrapper', ([_, owner, provider, juror1]) =>
             const ethAmount = await uniswapExternalExchange.getTokenToEthInputPrice(externalAmount)
             const collateralAmount = await uniswapCollateralExchange.getEthToTokenInputPrice(ethAmount)
             const initialActiveAmount = (await registry.balanceOf(juror1))[0]
-            const bondedTokensToGet = await presale.contributionToTokens(collateralAmount)
 
             await externalToken.approve(cpa.address, externalAmount, { from: juror1 })
             await cpa.contributeExternalToken(externalToken.address, externalAmount, 1, 1, await getDeadline(), activate, { from: juror1 })
 
-            const finalActiveAmount = (await registry.balanceOf(juror1))[0]
-            const expectedActiveAmount = activate ? initialActiveAmount.add(bondedTokensToGet) : bn(0)
-            assertBn(finalActiveAmount, expectedActiveAmount, `Active balance `)
+            await checkFinalBalances(collateralAmount, activate, initialActiveAmount)
+
             assert.equal((await externalToken.balanceOf(cpa.address)).toNumber(), 0, 'Wrapper external token balance should always be zero')
             assert.equal((await collateralToken.balanceOf(cpa.address)).toNumber(), 0, 'Wrapper collateral token balance should always be zero')
             assert.equal((await bondedToken.balanceOf(cpa.address)).toNumber(), 0, 'Wrapper bonded token balance should always be zero')
@@ -186,13 +197,11 @@ contract('Court presale and activate wrapper', ([_, owner, provider, juror1]) =>
             const ethAmount = bigExp(1, 16)
             const collateralAmount = await uniswapCollateralExchange.getEthToTokenInputPrice(ethAmount)
             const initialActiveAmount = (await registry.balanceOf(juror1))[0]
-            const bondedTokensToGet = await presale.contributionToTokens(collateralAmount)
 
             await cpa.contributeEth(1, await getDeadline(), activate, { from: juror1, value: ethAmount })
 
-            const finalActiveAmount = (await registry.balanceOf(juror1))[0]
-            const expectedActiveAmount = activate ? initialActiveAmount.add(bondedTokensToGet) : bn(0)
-            assertBn(finalActiveAmount, expectedActiveAmount, `Active balance `)
+            await checkFinalBalances(collateralAmount, activate, initialActiveAmount)
+
             assert.equal(await getBalance(cpa.address), '0', 'Wrapper ETH balance should always be zero')
             assert.equal((await collateralToken.balanceOf(cpa.address)).toNumber(), 0, 'Wrapper collateral token balance should always be zero')
             assert.equal((await bondedToken.balanceOf(cpa.address)).toNumber(), 0, 'Wrapper bonded token balance should always be zero')
@@ -202,13 +211,11 @@ contract('Court presale and activate wrapper', ([_, owner, provider, juror1]) =>
             const ethAmount = bigExp(1, 16)
             const collateralAmount = await uniswapCollateralExchange.getEthToTokenInputPrice(ethAmount)
             const initialActiveAmount = (await registry.balanceOf(juror1))[0]
-            const bondedTokensToGet = await presale.contributionToTokens(collateralAmount)
 
             await cpa.sendTransaction({ from: juror1, value: ethAmount, data: activateData })
 
-            const finalActiveAmount = (await registry.balanceOf(juror1))[0]
-            const expectedActiveAmount = activate ? initialActiveAmount.add(bondedTokensToGet) : bn(0)
-            assertBn(finalActiveAmount, expectedActiveAmount, `Active balance `)
+            await checkFinalBalances(collateralAmount, activate, initialActiveAmount)
+
             assert.equal(await getBalance(cpa.address), '0', 'Wrapper ETH balance should always be zero')
             assert.equal((await collateralToken.balanceOf(cpa.address)).toNumber(), 0, 'Wrapper collateral token balance should always be zero')
             assert.equal((await bondedToken.balanceOf(cpa.address)).toNumber(), 0, 'Wrapper bonded token balance should always be zero')

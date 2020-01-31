@@ -35,7 +35,7 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
     IPresale public presale;
     IUniswapFactory public uniswapFactory;
 
-    event BoughtAndRegistered(address from, address collateralToken, uint256 buyAmount, uint256 stakedAmount, bool activated);
+    event Bought(address from, address contributionToken, uint256 buyAmount, uint256 stakedAmount, bool activated);
 
     modifier onlyGovernor() {
         require(msg.sender == governor, ERROR_NOT_GOVERNOR);
@@ -53,6 +53,15 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
         registry = _registry;
         presale = _presale;
         uniswapFactory = _uniswapFactory;
+    }
+
+    /**
+    * @notice Convert ETH to tokens and activate them in the Registry.
+    * @dev User specifies exact input (msg.value).
+    * @dev User cannot specify minimum output or deadline.
+    */
+    function () external payable {
+        _contributeEth(1, block.timestamp, _hasData(msg.data));
     }
 
     /**
@@ -74,7 +83,7 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
 
         bool activate = _hasData(_data);
 
-        _buyAndRegisterAsJuror(_from, _amount, token, activate);
+        _buyAndActivateAsJuror(_from, _amount, token, activate);
     }
 
     /**
@@ -115,10 +124,16 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
         // swap tokens
         ERC20 token = ERC20(_token);
         require(token.safeApprove(address(uniswapExchange), _amount), ERROR_TOKEN_APPROVAL_FAILED);
-        uint256 contributionTokenAmount = uniswapExchange.tokenToTokenSwapInput(_amount, _minTokens, _minEth, _deadline, contributionTokenAddress);
+        uint256 contributionTokenAmount = uniswapExchange.tokenToTokenSwapInput(
+            _amount,
+            _minTokens,
+            _minEth,
+            _deadline,
+            contributionTokenAddress
+        );
 
         // buy in presale
-        _buyAndRegisterAsJuror(msg.sender, contributionTokenAmount, contributionToken, _activate);
+        _buyAndActivateAsJuror(msg.sender, contributionTokenAmount, contributionToken, _activate);
     }
 
     /**
@@ -143,6 +158,7 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
         uint256 selfBalance = address(this).balance;
         require(selfBalance >= _amount, ERROR_NOT_ENOUGH_BALANCE);
 
+        // solium-disable security/no-call-value
         (bool result,) = _recipient.call.value(_amount)("");
         require(result, ERROR_ETH_REFUND);
     }
@@ -161,15 +177,6 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
         require(_token.safeTransfer(_recipient, _amount), ERROR_TOKEN_REFUND);
     }
 
-    /**
-    * @notice Convert ETH to tokens and activate them in the Registry.
-    * @dev User specifies exact input (msg.value).
-    * @dev User cannot specify minimum output or deadline.
-    */
-    function () external payable {
-        _contributeEth(1, block.timestamp, _hasData(msg.data));
-    }
-
     function _contributeEth(uint256 _minTokens, uint256 _deadline, bool _activate) internal {
         require(msg.value > 0, ERROR_ZERO_AMOUNT);
 
@@ -184,29 +191,30 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
         uint256 contributionTokenAmount = uniswapExchange.ethToTokenSwapInput.value(msg.value)(_minTokens, _deadline);
 
         // buy in presale
-        _buyAndRegisterAsJuror(msg.sender, contributionTokenAmount, contributionToken, _activate);
+        _buyAndActivateAsJuror(msg.sender, contributionTokenAmount, contributionToken, _activate);
     }
 
-    function _hasData(bytes memory _data) internal pure returns (bool) {
-        return _data.length > 0;
-    }
-
-    function _buyAndRegisterAsJuror(address _from, uint256 _amount, ERC20 _token, bool _activate) internal {
+    function _buyAndActivateAsJuror(address _from, uint256 _amount, ERC20 _contributionToken, bool _activate) internal {
         // approve to presale
-        require(_token.safeApprove(address(presale), _amount), ERROR_TOKEN_APPROVAL_FAILED);
+        require(_contributionToken.safeApprove(address(presale), _amount), ERROR_TOKEN_APPROVAL_FAILED);
 
         // buy in presale
         presale.contribute(address(this), _amount);
         uint256 bondedTokensObtained = presale.contributionToTokens(_amount);
 
-        // activate in registry
-        bondedToken.approve(address(registry), bondedTokensObtained);
-        bytes memory data = new bytes(0);
         if (_activate) {
-            data = abi.encodePacked(ACTIVATE_DATA);
+            // stake and activate in registry
+            require(bondedToken.safeApprove(address(registry), bondedTokensObtained), ERROR_TOKEN_APPROVAL_FAILED);
+            registry.stakeFor(_from, bondedTokensObtained, abi.encodePacked(ACTIVATE_DATA));
+        } else {
+            // send tokens to user's account
+            require(bondedToken.safeTransfer(_from, bondedTokensObtained), ERROR_TOKEN_TRANSFER_FAILED);
         }
-        registry.stakeFor(_from, bondedTokensObtained, data);
 
-        emit BoughtAndRegistered(_from, address(_token), _amount, bondedTokensObtained, _activate);
+        emit Bought(_from, address(_contributionToken), _amount, bondedTokensObtained, _activate);
+    }
+
+    function _hasData(bytes memory _data) internal pure returns (bool) {
+        return _data.length > 0;
     }
 }
