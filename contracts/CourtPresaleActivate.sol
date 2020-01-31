@@ -74,7 +74,7 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
 
         bool activate = _hasData(_data);
 
-        _buyAndRegisterAsJuror(_from, _amount, token, activate);
+        _buyAndActivateAsJuror(_from, _amount, token, activate);
     }
 
     /**
@@ -118,7 +118,7 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
         uint256 contributionTokenAmount = uniswapExchange.tokenToTokenSwapInput(_amount, _minTokens, _minEth, _deadline, contributionTokenAddress);
 
         // buy in presale
-        _buyAndRegisterAsJuror(msg.sender, contributionTokenAmount, contributionToken, _activate);
+        _buyAndActivateAsJuror(msg.sender, contributionTokenAmount, contributionToken, _activate);
     }
 
     /**
@@ -184,14 +184,14 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
         uint256 contributionTokenAmount = uniswapExchange.ethToTokenSwapInput.value(msg.value)(_minTokens, _deadline);
 
         // buy in presale
-        _buyAndRegisterAsJuror(msg.sender, contributionTokenAmount, contributionToken, _activate);
+        _buyAndActivateAsJuror(msg.sender, contributionTokenAmount, contributionToken, _activate);
     }
 
     function _hasData(bytes memory _data) internal pure returns (bool) {
         return _data.length > 0;
     }
 
-    function _buyAndRegisterAsJuror(address _from, uint256 _amount, ERC20 _token, bool _activate) internal {
+    function _buyAndActivateAsJuror(address _from, uint256 _amount, ERC20 _token, bool _activate) internal {
         // approve to presale
         require(_token.safeApprove(address(presale), _amount), ERROR_TOKEN_APPROVAL_FAILED);
 
@@ -199,13 +199,14 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
         presale.contribute(address(this), _amount);
         uint256 bondedTokensObtained = presale.contributionToTokens(_amount);
 
-        // activate in registry
-        bondedToken.approve(address(registry), bondedTokensObtained);
-        bytes memory data = new bytes(0);
         if (_activate) {
-            data = abi.encodePacked(ACTIVATE_DATA);
+            // activate in registry
+            require(bondedToken.safeApprove(address(registry), bondedTokensObtained), ERROR_TOKEN_APPROVAL_FAILED);
+            registry.stakeFor(_from, bondedTokensObtained, abi.encodePacked(ACTIVATE_DATA));
+        } else {
+            // send tokens to user's account
+            require(bondedToken.safeTransfer(_from, bondedTokensObtained), ERROR_TOKEN_TRANSFER_FAILED);
         }
-        registry.stakeFor(_from, bondedTokensObtained, data);
 
         emit BoughtAndRegistered(_from, address(_token), _amount, bondedTokensObtained, _activate);
     }
