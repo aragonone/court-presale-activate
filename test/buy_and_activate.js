@@ -81,8 +81,15 @@ contract('Court presale and activate wrapper', ([_, owner, provider, juror1]) =>
         const finalActiveAmount = (await registry.balanceOf(juror1))[0]
         const finalUserBalance = await bondedToken.balanceOf(juror1)
         const finalExpectedAmount = initialActiveAmount.add(bondedTokensToGet)
-        const expectedActiveAmount = activate ? finalExpectedAmount : bn(0)
-        const expectedUserBalance = finalExpectedAmount.sub(expectedActiveAmount)
+        let expectedActiveAmount
+        let expectedUserBalance
+        if (activate) {
+          expectedActiveAmount = finalExpectedAmount
+          expectedUserBalance = bn(0)
+        } else {
+          expectedActiveAmount = bn(0)
+          expectedUserBalance = finalExpectedAmount
+        }
         assertBn(finalActiveAmount, expectedActiveAmount, `Active balance doesn't match`)
         assertBn(finalUserBalance, expectedUserBalance, `User's balance doesn't match`)
       }
