@@ -19,7 +19,7 @@ const NonPayable = artifacts.require('NonPayableMock')
 const getDeadline = async () => bn((await getBlock(await getBlockNumber())).timestamp).add(bn(86400))
 
 
-contract('Court presale and activate wrapper', ([_, owner, provider, juror1]) => {
+contract('Court presale and activate wrapper', ([_, owner, provider, juror1, other]) => {
   let collateralToken, bondedToken, registry, presale, uniswapFactory
 
   const ZERO_ADDRESS = '0x' + '0'.repeat(40)
@@ -108,25 +108,35 @@ contract('Court presale and activate wrapper', ([_, owner, provider, juror1]) =>
           await checkFinalBalances(amount, activate, initialActiveAmount, initialUserBalance)
         })
 
-        it(`buys, stakes${activateDescription}, in two transactions`, async () => {
-          const amount = DEFAULTS.minActiveBalance.mul(PPM).div(exchangeRate)
-          const initialActiveAmount = (await registry.balanceOf(juror1))[0]
-          const initialUserBalance = await bondedToken.balanceOf(juror1)
-
-          await collateralToken.approve(cpa.address, amount, { from: juror1 })
-          await cpa.receiveApproval(juror1, amount, collateralToken.address, activateData, { from: juror1 })
-
-          await checkFinalBalances(amount, activate, initialActiveAmount, initialUserBalance)
-
-          assert.equal((await collateralToken.balanceOf(cpa.address)).toNumber(), 0, 'Wrapper collateral token balance should always be zero')
-          assert.equal((await bondedToken.balanceOf(cpa.address)).toNumber(), 0, 'Wrapper bonded token balance should always be zero')
-        })
-
         it('fails in receive approval with wrong token', async () => {
           const amount = DEFAULTS.minActiveBalance.mul(PPM).div(exchangeRate)
 
           await bondedToken.approve(cpa.address, amount, { from: juror1 })
           await assertRevert(cpa.receiveApproval(juror1, amount, bondedToken.address, activateData, { from: juror1 }), ERROR_WRONG_TOKEN)
+        })
+
+        it('cannot use receive approval for own account', async () => {
+          const amount = DEFAULTS.minActiveBalance.mul(PPM).div(exchangeRate)
+          const initialCollateralBalance = await bondedToken.balanceOf(juror1)
+          const initialBondedBalance = await bondedToken.balanceOf(juror1)
+
+          await collateralToken.approve(cpa.address, amount, { from: juror1 })
+          await assertRevert(cpa.receiveApproval(juror1, amount, collateralToken.address, activateData, { from: juror1 }), ERROR_WRONG_TOKEN)
+
+          assert.equal((await bondedToken.balanceOf(cpa.address)).toNumber(), initialBondedBalance, 'User bonded token balance should be same as initial')
+          assert.equal((await collateralToken.balanceOf(cpa.address)).toNumber(), initialCollateralBalance, 'User collateral token balance should be same as initial')
+        })
+
+        it('cannot buy for any other approved account', async () => {
+          const amount = DEFAULTS.minActiveBalance.mul(PPM).div(exchangeRate)
+          const initialCollateralBalance = await bondedToken.balanceOf(juror1)
+          const initialBondedBalance = await bondedToken.balanceOf(juror1)
+
+          await collateralToken.approve(cpa.address, amount, { from: juror1 })
+          await assertRevert(cpa.receiveApproval(juror1, amount, collateralToken.address, activateData, { from: other }), ERROR_WRONG_TOKEN)
+
+          assert.equal((await bondedToken.balanceOf(cpa.address)).toNumber(), initialBondedBalance, 'User bonded token balance should be same as initial')
+          assert.equal((await collateralToken.balanceOf(cpa.address)).toNumber(), initialCollateralBalance, 'User collateral token balance should be same as initial')
         })
       })
 
@@ -333,16 +343,6 @@ contract('Court presale and activate wrapper', ([_, owner, provider, juror1]) =>
       await badCollateralToken.setTransferMisbehave(true)
 
       await assertRevert(badCollateralToken.approveAndCall(cpa.address, amount, '0x00', { from: juror1 }), ERROR_TOKEN_TRANSFER_FAILED)
-    })
-
-    it('receive approval fails if collateral token approve fails', async () => {
-      const amount = DEFAULTS.minActiveBalance.mul(PPM).div(exchangeRate)
-
-      await badCollateralToken.approve(cpa.address, amount, { from: juror1 })
-      // make token misbehave
-      await badCollateralToken.setApproveMisbehave(true)
-
-      await assertRevert(cpa.receiveApproval(juror1, amount, badCollateralToken.address, '0x00', { from: juror1 }), ERROR_TOKEN_APPROVAL_FAILED)
     })
 
     it('contribute external token fails if collateral token approve fails', async () => {

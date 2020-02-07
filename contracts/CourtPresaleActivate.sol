@@ -75,7 +75,10 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
     */
     function receiveApproval(address _from, uint256 _amount, address _token, bytes calldata _data) external {
         require(_amount > 0, ERROR_ZERO_AMOUNT);
-        require(_token == address(presale.contributionToken()), ERROR_WRONG_TOKEN);
+        require(
+            _token == msg.sender && _token == address(presale.contributionToken()),
+            ERROR_WRONG_TOKEN
+        );
 
         // move tokens to this contract
         ERC20 token = ERC20(_token);
