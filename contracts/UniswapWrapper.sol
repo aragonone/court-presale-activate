@@ -14,6 +14,7 @@ contract UniswapWrapper is IsContract {
     string private constant ERROR_TOKEN_NOT_CONTRACT = "UW_TOKEN_NOT_CONTRACT";
     string private constant ERROR_REGISTRY_NOT_CONTRACT = "UW_REGISTRY_NOT_CONTRACT";
     string private constant ERROR_UNISWAP_FACTORY_NOT_CONTRACT = "UW_UNISWAP_FACTORY_NOT_CONTRACT";
+    string private constant ERROR_RECEIVED_WRONG_TOKEN = "UW_RECEIVED_WRONG_TOKEN";
     string private constant ERROR_ZERO_AMOUNT = "UW_ZERO_AMOUNT";
     string private constant ERROR_TOKEN_TRANSFER_FAILED = "UW_TOKEN_TRANSFER_FAILED";
     string private constant ERROR_TOKEN_APPROVAL_FAILED = "UW_TOKEN_APPROVAL_FAILED";
@@ -38,15 +39,17 @@ contract UniswapWrapper is IsContract {
     }
 
     /**
-    * @dev This function must be triggered by the external token approve-and-call fallback.
-    *      It will pull the approved tokens and convert them in Uniswap, and activate the converted tokens into a
-    *      jurors registry instance of an Aragon Court.
+    * @dev This function must be triggered by an external token's approve-and-call fallback.
+    *      It will pull the approved tokens and convert them in Uniswap, and activate the converted
+    *      tokens into a jurors registry instance of an Aragon Court.
     * @param _from Address of the original caller (juror) converting and activating the tokens
     * @param _amount Amount of external tokens to be converted and activated
     * @param _token Address of the external token triggering the approve-and-call fallback
     * @param _data If non-empty it will signal token activation in the registry
     */
     function receiveApproval(address _from, uint256 _amount, address _token, bytes calldata _data) external {
+        require(_token == msg.sender, ERROR_RECEIVED_WRONG_TOKEN);
+
         bool activate;
         uint256 minTokens;
         uint256 minEth;
