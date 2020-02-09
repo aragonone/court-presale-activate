@@ -34,14 +34,13 @@ const deployRegistry = async (owner) => {
 }
 
 const deployPresale = async (owner, collateralToken, bondedToken, exchangeRate) => {
-
   const presale = await Presale.new(collateralToken.address, bondedToken.address, exchangeRate)
   return { presale }
 }
 
-const deployUniswap = async (token) => {
+const deployUniswap = async (collateralToken) => {
   const uniswapFactory = await UniswapFactory.new()
-  await uniswapFactory.createExchange(token.address)
+  await uniswapFactory.createExchange(collateralToken.address)
 
   return { uniswapFactory }
 }
@@ -68,6 +67,7 @@ const deploy = async ({
 
 module.exports = {
   deploy,
+  deployPresale,
   deployRegistry,
   deployUniswap
 }

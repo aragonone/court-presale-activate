@@ -13,6 +13,7 @@ import "./lib/uniswap/interfaces/IUniswapFactory.sol";
 contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
     using SafeERC20 for ERC20;
 
+    string private constant ERROR_NOT_GOVERNOR = "CPA_NOT_GOVERNOR";
     string private constant ERROR_TOKEN_NOT_CONTRACT = "CPA_TOKEN_NOT_CONTRACT";
     string private constant ERROR_REGISTRY_NOT_CONTRACT = "CPA_REGISTRY_NOT_CONTRACT";
     string private constant ERROR_PRESALE_NOT_CONTRACT = "CPA_PRESALE_NOT_CONTRACT";
@@ -24,26 +25,43 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
     string private constant ERROR_ETH_REFUND = "CPA_ETH_REFUND";
     string private constant ERROR_TOKEN_REFUND = "CPA_TOKEN_REFUND";
     string private constant ERROR_UNISWAP_UNAVAILABLE = "CPA_UNISWAP_UNAVAILABLE";
+    string private constant ERROR_NOT_ENOUGH_BALANCE = "CPA_NOT_ENOUGH_BALANCE";
 
     bytes32 internal constant ACTIVATE_DATA = keccak256("activate(uint256)");
 
+    address public governor;
     ERC20 public bondedToken;
     ERC900 public registry;
     IPresale public presale;
     IUniswapFactory public uniswapFactory;
 
-    event BoughtAndActivated(address from, address collateralToken, uint256 buyAmount, uint256 activatedAmount);
+    event Bought(address from, address contributionToken, uint256 buyAmount, uint256 stakedAmount, bool activated);
 
-    constructor(ERC20 _bondedToken, ERC900 _registry, IPresale _presale, IUniswapFactory _uniswapFactory) public {
+    modifier onlyGovernor() {
+        require(msg.sender == governor, ERROR_NOT_GOVERNOR);
+        _;
+    }
+
+    constructor(address _governor, ERC20 _bondedToken, ERC900 _registry, IPresale _presale, IUniswapFactory _uniswapFactory) public {
         require(isContract(address(_bondedToken)), ERROR_TOKEN_NOT_CONTRACT);
         require(isContract(address(_registry)), ERROR_REGISTRY_NOT_CONTRACT);
         require(isContract(address(_presale)), ERROR_PRESALE_NOT_CONTRACT);
         require(isContract(address(_uniswapFactory)), ERROR_UNISWAP_FACTORY_NOT_CONTRACT);
 
+        governor = _governor;
         bondedToken = _bondedToken;
         registry = _registry;
         presale = _presale;
         uniswapFactory = _uniswapFactory;
+    }
+
+    /**
+    * @notice Convert ETH to tokens and activate them in the Registry.
+    * @dev User specifies exact input (msg.value).
+    * @dev User cannot specify minimum output or deadline.
+    */
+    function () external payable {
+        _contributeEth(1, block.timestamp, _hasData(msg.data));
     }
 
     /**
@@ -57,21 +75,18 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
     */
     function receiveApproval(address _from, uint256 _amount, address _token, bytes calldata _data) external {
         require(_amount > 0, ERROR_ZERO_AMOUNT);
-        require(_token == address(presale.contributionToken()), ERROR_WRONG_TOKEN);
+        require(
+            _token == msg.sender && _token == address(presale.contributionToken()),
+            ERROR_WRONG_TOKEN
+        );
 
         // move tokens to this contract
         ERC20 token = ERC20(_token);
         require(token.safeTransferFrom(_from, address(this), _amount), ERROR_TOKEN_TRANSFER_FAILED);
 
-        bool activate;
-        if (_data.length > 0) {
-            activate = true;
-        }
+        bool activate = _hasData(_data);
 
-        _buyAndActivate(_from, _amount, _token, activate);
-
-        // refund leftovers if any
-        _refund(token);
+        _buyAndActivateAsJuror(_from, _amount, token, activate);
     }
 
     /**
@@ -96,21 +111,22 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
     )
         external
     {
+        ERC20 contributionToken = presale.contributionToken();
+        address contributionTokenAddress = address(contributionToken);
+        require(_token != contributionTokenAddress, ERROR_WRONG_TOKEN);
         require(_amount > 0, ERROR_ZERO_AMOUNT);
 
         // move tokens to this contract
         require(ERC20(_token).safeTransferFrom(msg.sender, address(this), _amount), ERROR_TOKEN_TRANSFER_FAILED);
 
-        // get the Uniswap exchange for the external token
+        // get the Uniswap exchange for the contribution token
         address payable uniswapExchangeAddress = uniswapFactory.getExchange(_token);
         require(uniswapExchangeAddress != address(0), ERROR_UNISWAP_UNAVAILABLE);
         IUniswapExchange uniswapExchange = IUniswapExchange(uniswapExchangeAddress);
 
+        // swap tokens
         ERC20 token = ERC20(_token);
         require(token.safeApprove(address(uniswapExchange), _amount), ERROR_TOKEN_APPROVAL_FAILED);
-
-        // swap tokens
-        address contributionTokenAddress = address(presale.contributionToken());
         uint256 contributionTokenAmount = uniswapExchange.tokenToTokenSwapInput(
             _amount,
             _minTokens,
@@ -120,11 +136,7 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
         );
 
         // buy in presale
-        _buyAndActivate(msg.sender, contributionTokenAmount, contributionTokenAddress, _activate);
-
-        // refund leftovers if any
-        _refund(token);
-        _refund(contributionTokenAddress);
+        _buyAndActivateAsJuror(msg.sender, contributionTokenAmount, contributionToken, _activate);
     }
 
     /**
@@ -136,12 +148,45 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
     * @param _activate Signal activation of tokens in the registry
     */
     function contributeEth(uint256 _minTokens, uint256 _deadline, bool _activate) external payable {
+        _contributeEth(_minTokens, _deadline, _activate);
+    }
+
+    /**
+    * @notice Refunds accidentally sent ETH. Only governor can do it
+    * @param _recipient Address to send funds to
+    * @param _amount Amount to be refunded
+    */
+    function refundEth(address payable _recipient, uint256 _amount) external onlyGovernor {
+        require(_amount > 0, ERROR_ZERO_AMOUNT);
+        uint256 selfBalance = address(this).balance;
+        require(selfBalance >= _amount, ERROR_NOT_ENOUGH_BALANCE);
+
+        // solium-disable security/no-call-value
+        (bool result,) = _recipient.call.value(_amount)("");
+        require(result, ERROR_ETH_REFUND);
+    }
+
+    /**
+    * @notice Refunds accidentally sent ERC20 tokens. Only governor can do it
+    * @param _token Token to be refunded
+    * @param _recipient Address to send funds to
+    * @param _amount Amount to be refunded
+    */
+    function refundToken(ERC20 _token, address _recipient, uint256 _amount) external onlyGovernor {
+        require(_amount > 0, ERROR_ZERO_AMOUNT);
+        uint256 selfBalance = _token.balanceOf(address(this));
+        require(selfBalance >= _amount, ERROR_NOT_ENOUGH_BALANCE);
+
+        require(_token.safeTransfer(_recipient, _amount), ERROR_TOKEN_REFUND);
+    }
+
+    function _contributeEth(uint256 _minTokens, uint256 _deadline, bool _activate) internal {
         require(msg.value > 0, ERROR_ZERO_AMOUNT);
 
-        address contributionTokenAddress = address(presale.contributionToken());
+        ERC20 contributionToken = presale.contributionToken();
 
         // get the Uniswap exchange for the contribution token
-        address payable uniswapExchangeAddress = uniswapFactory.getExchange(contributionTokenAddress);
+        address payable uniswapExchangeAddress = uniswapFactory.getExchange(address(contributionToken));
         require(uniswapExchangeAddress != address(0), ERROR_UNISWAP_UNAVAILABLE);
         IUniswapExchange uniswapExchange = IUniswapExchange(uniswapExchangeAddress);
 
@@ -149,50 +194,30 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
         uint256 contributionTokenAmount = uniswapExchange.ethToTokenSwapInput.value(msg.value)(_minTokens, _deadline);
 
         // buy in presale
-        _buyAndActivate(msg.sender, contributionTokenAmount, contributionTokenAddress, _activate);
-
-        // make sure there's no ETH left
-        uint256 ethBalance = address(this).balance;
-        if (ethBalance > 0) {
-            // solium-disable security/no-call-value
-            (bool result,) = msg.sender.call.value(ethBalance)("");
-            require(result, ERROR_ETH_REFUND);
-        }
+        _buyAndActivateAsJuror(msg.sender, contributionTokenAmount, contributionToken, _activate);
     }
 
-    function _buyAndActivate(address _from, uint256 _amount, address _token, bool _activate) internal {
+    function _buyAndActivateAsJuror(address _from, uint256 _amount, ERC20 _contributionToken, bool _activate) internal {
         // approve to presale
-        require(ERC20(_token).safeApprove(address(presale), _amount), ERROR_TOKEN_APPROVAL_FAILED);
+        require(_contributionToken.safeApprove(address(presale), _amount), ERROR_TOKEN_APPROVAL_FAILED);
 
         // buy in presale
         presale.contribute(address(this), _amount);
         uint256 bondedTokensObtained = presale.contributionToTokens(_amount);
 
-        // approve to registry
-        require(bondedToken.safeApprove(address(registry), bondedTokensObtained), ERROR_TOKEN_APPROVAL_FAILED);
-
-        // activate in registry
-        bytes memory data;
         if (_activate) {
-            data = abi.encodePacked(ACTIVATE_DATA);
+            // stake and activate in registry
+            require(bondedToken.safeApprove(address(registry), bondedTokensObtained), ERROR_TOKEN_APPROVAL_FAILED);
+            registry.stakeFor(_from, bondedTokensObtained, abi.encodePacked(ACTIVATE_DATA));
+        } else {
+            // send tokens to user's account
+            require(bondedToken.safeTransfer(_from, bondedTokensObtained), ERROR_TOKEN_TRANSFER_FAILED);
         }
-        registry.stakeFor(_from, bondedTokensObtained, data);
 
-        // refund leftovers if any
-        _refund(bondedToken);
-
-        emit BoughtAndActivated(_from, _token, _amount, bondedTokensObtained);
+        emit Bought(_from, address(_contributionToken), _amount, bondedTokensObtained, _activate);
     }
 
-    function _refund(address _tokenAddress) internal {
-        ERC20 token = ERC20(_tokenAddress);
-        _refund(token);
-    }
-
-    function _refund(ERC20 _token) internal {
-        uint256 selfBalance = _token.balanceOf(address(this));
-        if (selfBalance > 0) {
-            require(_token.safeTransfer(msg.sender, selfBalance), ERROR_TOKEN_REFUND);
-        }
+    function _hasData(bytes memory _data) internal pure returns (bool) {
+        return _data.length > 0;
     }
 }

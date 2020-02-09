@@ -1,20 +1,16 @@
 {
   "name": "@aragon/court-presale-activate",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "Wrapper to buy tokens in the presale and activate them in the Court in one transaction",
   "scripts": {
     "compile": "truffle compile",
     "lint": "npm run lint:solidity && npm run lint:js",
-    "lint:js": "eslint ./test ./scripts ./migrations",
+    "lint:js": "eslint ./test ./migrations",
     "lint:solidity": "solium --dir ./contracts",
     "test": "GAS_LIMIT=10e6 npm run ganache-cli:test",
     "test:gas": "GAS_REPORTER=true npm test",
     "coverage": "npx truffle run coverage",
     "ganache-cli:test": "./node_modules/@aragon/test-helpers/ganache-cli.sh",
-    "deploy:rpc": "npx truffle exec scripts/deploy.js --network rpc",
-    "deploy:staging": "npx truffle exec scripts/deploy.js --network staging",
-    "deploy:rinkeby": "npx truffle exec scripts/deploy.js --network rinkeby",
-    "deploy:mainnet": "npx truffle exec scripts/deploy.js --network mainnet",
     "abi:extract": "truffle-extract --output abi/ --keys abi",
     "prepublishOnly": "truffle compile --all && npm run abi:extract -- --no-compile"
   },
@@ -22,7 +18,6 @@
     "/abi",
     "/build",
     "/contracts",
-    "/scripts",
     "/test"
   ],
   "dependencies": {
