@@ -26,6 +26,7 @@ contract('Court Uniswap wrapper', ([_, owner, provider, juror1, other]) => {
   const ERROR_REGISTRY_NOT_CONTRACT = 'UW_REGISTRY_NOT_CONTRACT'
   const ERROR_UNISWAP_FACTORY_NOT_CONTRACT = 'UW_UNISWAP_FACTORY_NOT_CONTRACT'
   const ERROR_RECEIVED_WRONG_TOKEN = 'UW_RECEIVED_WRONG_TOKEN'
+  const ERROR_WRONG_DATA_LENGTH = 'UW_WRONG_DATA_LENGTH'
   const ERROR_ZERO_AMOUNT = 'UW_ZERO_AMOUNT'
   const ERROR_TOKEN_TRANSFER_FAILED = 'UW_TOKEN_TRANSFER_FAILED'
   const ERROR_TOKEN_APPROVAL_FAILED = 'UW_TOKEN_APPROVAL_FAILED'
@@ -107,6 +108,12 @@ contract('Court Uniswap wrapper', ([_, owner, provider, juror1, other]) => {
           it('fails when amount is zero', async () => {
             const approveAndCallData = await getApproveAndCallData(activate)
             await assertRevert(externalToken.approveAndCall(uniswapWrapper.address, 0, approveAndCallData, { from: juror1 }), ERROR_ZERO_AMOUNT)
+          })
+
+          it('fails when data length is wrong', async () => {
+            const approveAndCallData = (await getApproveAndCallData(activate)).slice(0, -64)
+            const externalAmount = bigExp(1, 21)
+            await assertRevert(externalToken.approveAndCall(uniswapWrapper.address, externalAmount, approveAndCallData, { from: juror1 }), ERROR_WRONG_DATA_LENGTH)
           })
 
           it('fails when approve and call fallback is not coming from Token (3rd party)', async () => {
