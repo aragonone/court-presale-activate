@@ -17,7 +17,7 @@ const UniswapWrapper = artifacts.require('UniswapWrapper')
 const getDeadline = async () => bn((await getBlock(await getBlockNumber())).timestamp).add(bn(86400))
 
 
-contract('Court Uniswap wrapper', ([_, owner, provider, juror1]) => {
+contract('Court Uniswap wrapper', ([_, owner, provider, juror1, other]) => {
   let bondedToken, registry, uniswapFactory
 
   const ZERO_ADDRESS = '0x' + '0'.repeat(40)
@@ -25,6 +25,7 @@ contract('Court Uniswap wrapper', ([_, owner, provider, juror1]) => {
   const ERROR_TOKEN_NOT_CONTRACT = 'UW_TOKEN_NOT_CONTRACT'
   const ERROR_REGISTRY_NOT_CONTRACT = 'UW_REGISTRY_NOT_CONTRACT'
   const ERROR_UNISWAP_FACTORY_NOT_CONTRACT = 'UW_UNISWAP_FACTORY_NOT_CONTRACT'
+  const ERROR_RECEIVED_WRONG_TOKEN = 'UW_RECEIVED_WRONG_TOKEN'
   const ERROR_ZERO_AMOUNT = 'UW_ZERO_AMOUNT'
   const ERROR_TOKEN_TRANSFER_FAILED = 'UW_TOKEN_TRANSFER_FAILED'
   const ERROR_TOKEN_APPROVAL_FAILED = 'UW_TOKEN_APPROVAL_FAILED'
@@ -106,6 +107,18 @@ contract('Court Uniswap wrapper', ([_, owner, provider, juror1]) => {
           it('fails when amount is zero', async () => {
             const approveAndCallData = await getApproveAndCallData(activate)
             await assertRevert(externalToken.approveAndCall(uniswapWrapper.address, 0, approveAndCallData, { from: juror1 }), ERROR_ZERO_AMOUNT)
+          })
+
+          it('fails when approve and call fallback is not coming from Token (3rd party)', async () => {
+            const approveAndCallData = await getApproveAndCallData(activate)
+            const externalAmount = bigExp(1, 21)
+            await assertRevert(uniswapWrapper.receiveApproval(juror1, externalAmount, externalToken.address, approveAndCallData, { from: other }), ERROR_RECEIVED_WRONG_TOKEN)
+          })
+
+          it('fails when approve and call fallback is not coming from Token (token holder)', async () => {
+            const approveAndCallData = await getApproveAndCallData(activate)
+            const externalAmount = bigExp(1, 21)
+            await assertRevert(uniswapWrapper.receiveApproval(juror1, externalAmount, externalToken.address, approveAndCallData, { from: juror1 }), ERROR_RECEIVED_WRONG_TOKEN)
           })
 
           it('buys, stakes' + activateDescription, async () => {
