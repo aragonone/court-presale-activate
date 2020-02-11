@@ -8,12 +8,12 @@ import "@aragon/court/contracts/standards/ERC900.sol";
 import "./lib/IPresale.sol";
 import "./lib/uniswap/interfaces/IUniswapExchange.sol";
 import "./lib/uniswap/interfaces/IUniswapFactory.sol";
+import "./Refundable.sol";
 
 
-contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
+contract CourtPresaleActivate is Refundable, IsContract, ApproveAndCallFallBack {
     using SafeERC20 for ERC20;
 
-    string private constant ERROR_NOT_GOVERNOR = "CPA_NOT_GOVERNOR";
     string private constant ERROR_TOKEN_NOT_CONTRACT = "CPA_TOKEN_NOT_CONTRACT";
     string private constant ERROR_REGISTRY_NOT_CONTRACT = "CPA_REGISTRY_NOT_CONTRACT";
     string private constant ERROR_PRESALE_NOT_CONTRACT = "CPA_PRESALE_NOT_CONTRACT";
@@ -22,14 +22,10 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
     string private constant ERROR_TOKEN_TRANSFER_FAILED = "CPA_TOKEN_TRANSFER_FAILED";
     string private constant ERROR_TOKEN_APPROVAL_FAILED = "CPA_TOKEN_APPROVAL_FAILED";
     string private constant ERROR_WRONG_TOKEN = "CPA_WRONG_TOKEN";
-    string private constant ERROR_ETH_REFUND = "CPA_ETH_REFUND";
-    string private constant ERROR_TOKEN_REFUND = "CPA_TOKEN_REFUND";
     string private constant ERROR_UNISWAP_UNAVAILABLE = "CPA_UNISWAP_UNAVAILABLE";
-    string private constant ERROR_NOT_ENOUGH_BALANCE = "CPA_NOT_ENOUGH_BALANCE";
 
     bytes32 internal constant ACTIVATE_DATA = keccak256("activate(uint256)");
 
-    address public governor;
     ERC20 public bondedToken;
     ERC900 public registry;
     IPresale public presale;
@@ -37,18 +33,12 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
 
     event Bought(address from, address contributionToken, uint256 buyAmount, uint256 stakedAmount, bool activated);
 
-    modifier onlyGovernor() {
-        require(msg.sender == governor, ERROR_NOT_GOVERNOR);
-        _;
-    }
-
-    constructor(address _governor, ERC20 _bondedToken, ERC900 _registry, IPresale _presale, IUniswapFactory _uniswapFactory) public {
+    constructor(address _governor, ERC20 _bondedToken, ERC900 _registry, IPresale _presale, IUniswapFactory _uniswapFactory) Refundable(_governor) public {
         require(isContract(address(_bondedToken)), ERROR_TOKEN_NOT_CONTRACT);
         require(isContract(address(_registry)), ERROR_REGISTRY_NOT_CONTRACT);
         require(isContract(address(_presale)), ERROR_PRESALE_NOT_CONTRACT);
         require(isContract(address(_uniswapFactory)), ERROR_UNISWAP_FACTORY_NOT_CONTRACT);
 
-        governor = _governor;
         bondedToken = _bondedToken;
         registry = _registry;
         presale = _presale;
@@ -149,35 +139,6 @@ contract CourtPresaleActivate is IsContract, ApproveAndCallFallBack {
     */
     function contributeEth(uint256 _minTokens, uint256 _deadline, bool _activate) external payable {
         _contributeEth(_minTokens, _deadline, _activate);
-    }
-
-    /**
-    * @notice Refunds accidentally sent ETH. Only governor can do it
-    * @param _recipient Address to send funds to
-    * @param _amount Amount to be refunded
-    */
-    function refundEth(address payable _recipient, uint256 _amount) external onlyGovernor {
-        require(_amount > 0, ERROR_ZERO_AMOUNT);
-        uint256 selfBalance = address(this).balance;
-        require(selfBalance >= _amount, ERROR_NOT_ENOUGH_BALANCE);
-
-        // solium-disable security/no-call-value
-        (bool result,) = _recipient.call.value(_amount)("");
-        require(result, ERROR_ETH_REFUND);
-    }
-
-    /**
-    * @notice Refunds accidentally sent ERC20 tokens. Only governor can do it
-    * @param _token Token to be refunded
-    * @param _recipient Address to send funds to
-    * @param _amount Amount to be refunded
-    */
-    function refundToken(ERC20 _token, address _recipient, uint256 _amount) external onlyGovernor {
-        require(_amount > 0, ERROR_ZERO_AMOUNT);
-        uint256 selfBalance = _token.balanceOf(address(this));
-        require(selfBalance >= _amount, ERROR_NOT_ENOUGH_BALANCE);
-
-        require(_token.safeTransfer(_recipient, _amount), ERROR_TOKEN_REFUND);
     }
 
     function _contributeEth(uint256 _minTokens, uint256 _deadline, bool _activate) internal {

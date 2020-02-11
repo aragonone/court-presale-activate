@@ -6,9 +6,10 @@ import "@aragon/court/contracts/lib/os/SafeERC20.sol";
 import "@aragon/court/contracts/standards/ERC900.sol";
 import "./lib/uniswap/interfaces/IUniswapExchange.sol";
 import "./lib/uniswap/interfaces/IUniswapFactory.sol";
+import "./Refundable.sol";
 
 
-contract UniswapWrapper is IsContract {
+contract UniswapWrapper is Refundable, IsContract {
     using SafeERC20 for ERC20;
 
     string private constant ERROR_TOKEN_NOT_CONTRACT = "UW_TOKEN_NOT_CONTRACT";
@@ -19,8 +20,6 @@ contract UniswapWrapper is IsContract {
     string private constant ERROR_ZERO_AMOUNT = "UW_ZERO_AMOUNT";
     string private constant ERROR_TOKEN_TRANSFER_FAILED = "UW_TOKEN_TRANSFER_FAILED";
     string private constant ERROR_TOKEN_APPROVAL_FAILED = "UW_TOKEN_APPROVAL_FAILED";
-    string private constant ERROR_ETH_REFUND = "UW_ETH_REFUND";
-    string private constant ERROR_TOKEN_REFUND = "UW_TOKEN_REFUND";
     string private constant ERROR_UNISWAP_UNAVAILABLE = "UW_UNISWAP_UNAVAILABLE";
 
     bytes32 internal constant ACTIVATE_DATA = keccak256("activate(uint256)");
@@ -29,7 +28,7 @@ contract UniswapWrapper is IsContract {
     ERC900 public registry;
     IUniswapFactory public uniswapFactory;
 
-    constructor(ERC20 _bondedToken, ERC900 _registry, IUniswapFactory _uniswapFactory) public {
+    constructor(address _governor, ERC20 _bondedToken, ERC900 _registry, IUniswapFactory _uniswapFactory) Refundable(_governor) public {
         require(isContract(address(_bondedToken)), ERROR_TOKEN_NOT_CONTRACT);
         require(isContract(address(_registry)), ERROR_REGISTRY_NOT_CONTRACT);
         require(isContract(address(_uniswapFactory)), ERROR_UNISWAP_FACTORY_NOT_CONTRACT);
@@ -116,14 +115,6 @@ contract UniswapWrapper is IsContract {
 
         // stake and activate in the registry
         _stakeAndActivate(msg.sender, bondedTokenAmount, _activate);
-
-        // make sure there's no ETH left
-        uint256 ethBalance = address(this).balance;
-        if (ethBalance > 0) {
-            // solium-disable security/no-call-value
-            (bool result,) = msg.sender.call.value(ethBalance)("");
-            require(result, ERROR_ETH_REFUND);
-        }
     }
 
     function _contributeExternalToken(
@@ -155,10 +146,6 @@ contract UniswapWrapper is IsContract {
 
         // stake and activate in the registry
         _stakeAndActivate(_from, bondedTokenAmount, _activate);
-
-        // refund leftovers if any
-        _refund(token);
-        _refund(bondedToken);
     }
 
     function _stakeAndActivate(address _from, uint256 _amount, bool _activate) internal {
@@ -169,15 +156,5 @@ contract UniswapWrapper is IsContract {
             data = abi.encodePacked(ACTIVATE_DATA);
         }
         registry.stakeFor(_from, _amount, data);
-
-        // refund leftovers if any
-        _refund(bondedToken);
-    }
-
-    function _refund(ERC20 _token) internal {
-        uint256 selfBalance = _token.balanceOf(address(this));
-        if (selfBalance > 0) {
-            require(_token.safeTransfer(msg.sender, selfBalance), ERROR_TOKEN_REFUND);
-        }
     }
 }

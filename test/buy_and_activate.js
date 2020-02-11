@@ -13,8 +13,6 @@ const ERC20Bad = artifacts.require('ERC20BadMock')
 const UniswapFactory = artifacts.require('UniswapFactory')
 const UniswapExchange = artifacts.require('UniswapExchange')
 const CourtPresaleActivate = artifacts.require('CourtPresaleActivate')
-const SelfDestruct = artifacts.require('SelfDestructMock')
-const NonPayable = artifacts.require('NonPayableMock')
 
 const getDeadline = async () => bn((await getBlock(await getBlockNumber())).timestamp).add(bn(86400))
 
@@ -33,10 +31,6 @@ contract('Court presale and activate wrapper', ([_, owner, provider, juror1, oth
   const ERROR_TOKEN_TRANSFER_FAILED = 'CPA_TOKEN_TRANSFER_FAILED'
   const ERROR_TOKEN_APPROVAL_FAILED = 'CPA_TOKEN_APPROVAL_FAILED'
   const ERROR_UNISWAP_UNAVAILABLE = 'CPA_UNISWAP_UNAVAILABLE'
-  const ERROR_NOT_GOVERNOR = 'CPA_NOT_GOVERNOR'
-  const ERROR_NOT_ENOUGH_BALANCE = 'CPA_NOT_ENOUGH_BALANCE'
-  const ERROR_ETH_REFUND = 'CPA_ETH_REFUND'
-  const ERROR_TOKEN_REFUND = 'CPA_TOKEN_REFUND'
 
   const INITIAL_BIG_TOKEN_AMOUNT = bigExp(1, 24)
   const exchangeRate = bn(200000)
@@ -233,74 +227,6 @@ contract('Court presale and activate wrapper', ([_, owner, provider, juror1, oth
             assert.equal(await getBalance(cpa.address), '0', 'Wrapper ETH balance should always be zero')
             assert.equal((await collateralToken.balanceOf(cpa.address)).toNumber(), 0, 'Wrapper collateral token balance should always be zero')
             assert.equal((await bondedToken.balanceOf(cpa.address)).toNumber(), 0, 'Wrapper bonded token balance should always be zero')
-          })
-        })
-      })
-
-      context('Refund accidentally sent tokens', () => {
-        const amount = bigExp(1, 17)
-
-        context('ETH', () => {
-          beforeEach('Send funds', async () => {
-            const selfDestruct = await SelfDestruct.new()
-            await selfDestruct.sendTransaction({ value: amount })
-            await selfDestruct.selfDestruct(cpa.address)
-          })
-
-          it('recovers funds', async () => {
-            assert.isTrue(bn(await getBalance(cpa.address)).gt(bn(0)), 'Wrapper ETH balance should be greater than zero before refund')
-            await cpa.refundEth(juror1, amount, { from: owner })
-            assert.equal(await getBalance(cpa.address), '0', 'Wrapper ETH balance should always be zero')
-          })
-
-          it('fails if non-governor tries to refund', async () => {
-            await assertRevert(cpa.refundEth(juror1, amount, { from: juror1 }), ERROR_NOT_GOVERNOR)
-          })
-
-          it('fails if requested amount to refund  zero', async () => {
-            await assertRevert(cpa.refundEth(juror1, 0, { from: owner }), ERROR_ZERO_AMOUNT)
-          })
-
-          it('fails if refunded amount is greater than balance', async () => {
-            await assertRevert(cpa.refundEth(juror1, amount.add(bn(1)), { from: owner }), ERROR_NOT_ENOUGH_BALANCE)
-          })
-
-          it('fails if transfer to recipient fails', async () => {
-            const nonPayable = await NonPayable.new()
-            await assertRevert(cpa.refundEth(nonPayable.address, amount, { from: owner }), ERROR_ETH_REFUND)
-          })
-        })
-
-        context('ECR20 tokens', () => {
-          beforeEach('Send funds', async () => {
-            await collateralToken.transfer(cpa.address, amount, { from: juror1 })
-          })
-
-          it('recovers funds', async () => {
-            assert.isTrue((await collateralToken.balanceOf(cpa.address)).gt(bn(0)), 'Wrapper collateral token balance should be greater than zero before refund')
-            await cpa.refundToken(collateralToken.address, juror1, amount, { from: owner })
-            assert.equal((await collateralToken.balanceOf(cpa.address)).toNumber(), 0, 'Wrapper collateral token balance should be zero')
-          })
-
-          it('fails if non-governor tries to refund', async () => {
-            await assertRevert(cpa.refundToken(collateralToken.address, juror1, amount, { from: juror1 }), ERROR_NOT_GOVERNOR)
-          })
-
-          it('fails if requested amount to refund is zero', async () => {
-            await assertRevert(cpa.refundToken(collateralToken.address, juror1, 0, { from: owner }), ERROR_ZERO_AMOUNT)
-          })
-
-          it('fails if refunded amount is greater than balance', async () => {
-            await assertRevert(cpa.refundToken(collateralToken.address, juror1, amount.add(bn(1)), { from: owner }), ERROR_NOT_ENOUGH_BALANCE)
-          })
-
-          it('fails if transfer to recipient fails', async () => {
-            // deploy bad tokens and send funds
-            const badCollateralToken = await ERC20Bad.new('Collateral Bad Token', 'CBT', 18)
-            await badCollateralToken.mint(cpa.address, amount)
-            await badCollateralToken.setTransferMisbehave(true)
-
-            await assertRevert(cpa.refundToken(badCollateralToken.address, juror1, amount, { from: owner }), ERROR_TOKEN_REFUND)
           })
         })
       })

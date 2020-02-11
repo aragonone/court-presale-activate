@@ -47,15 +47,15 @@ contract('Court Uniswap wrapper', ([_, owner, provider, juror1, other]) => {
 
     context('Deployment fails', () => {
       it('fails when bonded token is empty address', async () => {
-        await assertRevert(UniswapWrapper.new(ZERO_ADDRESS, registry.address, uniswapFactory.address), ERROR_TOKEN_NOT_CONTRACT)
+        await assertRevert(UniswapWrapper.new(owner, ZERO_ADDRESS, registry.address, uniswapFactory.address), ERROR_TOKEN_NOT_CONTRACT)
       })
 
       it('fails when registry is empty address', async () => {
-        await assertRevert(UniswapWrapper.new(bondedToken.address, ZERO_ADDRESS, uniswapFactory.address), ERROR_REGISTRY_NOT_CONTRACT)
+        await assertRevert(UniswapWrapper.new(owner, bondedToken.address, ZERO_ADDRESS, uniswapFactory.address), ERROR_REGISTRY_NOT_CONTRACT)
       })
 
       it('fails when uniswapFactory is empty address', async () => {
-        await assertRevert(UniswapWrapper.new(bondedToken.address, registry.address, ZERO_ADDRESS), ERROR_UNISWAP_FACTORY_NOT_CONTRACT)
+        await assertRevert(UniswapWrapper.new(owner, bondedToken.address, registry.address, ZERO_ADDRESS), ERROR_UNISWAP_FACTORY_NOT_CONTRACT)
       })
     })
 
@@ -64,9 +64,9 @@ contract('Court Uniswap wrapper', ([_, owner, provider, juror1, other]) => {
       const activateData = activate ? '0x01' : '0x'
       const activateDescription = activate ? ' and activates' : ''
 
-      beforeEach('Deploy airdrop contract', async () => {
+      beforeEach('Deploy contract', async () => {
         // deploy
-        uniswapWrapper = await UniswapWrapper.new(bondedToken.address, registry.address, uniswapFactory.address, { from: owner })
+        uniswapWrapper = await UniswapWrapper.new(owner, bondedToken.address, registry.address, uniswapFactory.address, { from: owner })
       })
 
       let uniswapBondedExchange
@@ -218,7 +218,7 @@ contract('Court Uniswap wrapper', ([_, owner, provider, juror1, other]) => {
       await uniswapFactory.createExchange(badExternalToken.address)
 
       // deploy wrapper
-      uniswapWrapper = await UniswapWrapper.new(bondedToken.address, registry.address, uniswapFactory.address, { from: owner })
+      uniswapWrapper = await UniswapWrapper.new(owner, bondedToken.address, registry.address, uniswapFactory.address, { from: owner })
     })
 
     it('contribute external token fails if collateral token approve fails', async () => {
@@ -253,7 +253,7 @@ contract('Court Uniswap wrapper', ([_, owner, provider, juror1, other]) => {
       const uniswapFactory = await UniswapFactory.new()
 
       // deploy wrapper
-      uniswapWrapper = await UniswapWrapper.new(bondedToken.address, registry.address, uniswapFactory.address, { from: owner })
+      uniswapWrapper = await UniswapWrapper.new(owner, bondedToken.address, registry.address, uniswapFactory.address, { from: owner })
     })
 
     context('External token', () => {
