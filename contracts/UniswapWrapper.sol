@@ -47,7 +47,7 @@ contract UniswapWrapper is IsContract {
     * @param _amount Amount of external tokens to be converted and activated
     * @param _token Address of the external token triggering the approve-and-call fallback
     * @param _data Contains:
-    *        - 1st word: activate If non-empty it will signal token activation in the registry
+    *        - 1st word: activate If non-zero, it will signal token activation in the registry
     *        - 2nd word: minTokens Uniswap param
     *        - 3rd word: minEth Uniswap param
     *        - 4th word: deadline Uniswap param
@@ -76,8 +76,8 @@ contract UniswapWrapper is IsContract {
     * @dev This function needs a previous approval on the external token used for the contributed amount.
     *      It will pull the approved tokens, convert them in Uniswap to the bonded token,
     *      and activate the converted tokens in the jurors registry instance of the Aragon Court.
-    * @param _token Address of the external contribution token used
     * @param _amount Amount of contribution tokens to be converted and activated
+    * @param _token Address of the external contribution token used
     * @param _minTokens Minimum amount of bonded tokens obtained in Uniswap
     * @param _minEth Minimum amount of ETH obtained in Uniswap (Uniswap internally converts first to ETH and then to target token)
     * @param _deadline Transaction deadline for Uniswap
