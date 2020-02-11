@@ -8,6 +8,8 @@ const { bn, bigExp } = require('@aragon/court/test/helpers/lib/numbers')
 
 const { deployRegistry, deployUniswap } = require('./helpers/deploy')
 
+const refundable = require('./refundable.js')
+
 const ERC20 = artifacts.require('ERC20Mock')
 const ERC20Bad = artifacts.require('ERC20BadMock')
 const UniswapFactory = artifacts.require('UniswapFactory')
@@ -17,7 +19,9 @@ const UniswapWrapper = artifacts.require('UniswapWrapper')
 const getDeadline = async () => bn((await getBlock(await getBlockNumber())).timestamp).add(bn(86400))
 
 
-contract('Court Uniswap wrapper', ([_, owner, provider, juror1, other]) => {
+contract('Court Uniswap wrapper', accounts => {
+  const [_, owner, provider, juror1, other] = accounts
+
   let bondedToken, registry, uniswapFactory
 
   const ZERO_ADDRESS = '0x' + '0'.repeat(40)
@@ -59,6 +63,10 @@ contract('Court Uniswap wrapper', ([_, owner, provider, juror1, other]) => {
       })
     })
 
+    const getUniswapWrapper = async () => {
+      return await UniswapWrapper.new(owner, bondedToken.address, registry.address, uniswapFactory.address, { from: owner })
+    }
+
     const testContribute = (activate) => {
       let uniswapWrapper
       const activateData = activate ? '0x01' : '0x'
@@ -66,7 +74,7 @@ contract('Court Uniswap wrapper', ([_, owner, provider, juror1, other]) => {
 
       beforeEach('Deploy contract', async () => {
         // deploy
-        uniswapWrapper = await UniswapWrapper.new(owner, bondedToken.address, registry.address, uniswapFactory.address, { from: owner })
+        uniswapWrapper = await getUniswapWrapper()
       })
 
       let uniswapBondedExchange
@@ -199,13 +207,15 @@ contract('Court Uniswap wrapper', ([_, owner, provider, juror1, other]) => {
       context('Doesn\'t activate tokens', () => {
         testContribute(false)
       })
+
+      refundable(getUniswapWrapper, { accounts, artifacts, web3 })
     })
   })
 
   context('Bad tokens', () => {
     let uniswapWrapper, badExternalToken
 
-    beforeEach('Deploy airdrop contract', async () => {
+    beforeEach('Deploy contracts', async () => {
       // deploy bad token
       badExternalToken = await ERC20Bad.new('External Bad Token', 'EBT', 18)
       await badExternalToken.mint(juror1, INITIAL_BIG_TOKEN_AMOUNT);
@@ -247,7 +257,7 @@ contract('Court Uniswap wrapper', ([_, owner, provider, juror1, other]) => {
   context('Without Uniswap exchange', () => {
     let uniswapWrapper
 
-    beforeEach('Deploy airdrop contract', async () => {
+    beforeEach('Deploy contracts', async () => {
       const { bondedToken, registry } = await deployRegistry(owner)
 
       const uniswapFactory = await UniswapFactory.new()

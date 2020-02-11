@@ -8,6 +8,8 @@ const { bn, bigExp } = require('@aragon/court/test/helpers/lib/numbers')
 
 const { deploy } = require('./helpers/deploy')
 
+const refundable = require('./refundable.js')
+
 const ERC20 = artifacts.require('ERC20Mock')
 const ERC20Bad = artifacts.require('ERC20BadMock')
 const UniswapFactory = artifacts.require('UniswapFactory')
@@ -17,7 +19,9 @@ const CourtPresaleActivate = artifacts.require('CourtPresaleActivate')
 const getDeadline = async () => bn((await getBlock(await getBlockNumber())).timestamp).add(bn(86400))
 
 
-contract('Court presale and activate wrapper', ([_, owner, provider, juror1, other]) => {
+contract('Court presale and activate wrapper', accounts => {
+  const [_, owner, provider, juror1, other] = accounts
+
   let collateralToken, bondedToken, registry, presale, uniswapFactory
 
   const ZERO_ADDRESS = '0x' + '0'.repeat(40)
@@ -60,14 +64,18 @@ contract('Court presale and activate wrapper', ([_, owner, provider, juror1, oth
       })
     })
 
+    const getCourtPresaleActivate = async () => {
+      return await CourtPresaleActivate.new(owner, bondedToken.address, registry.address, presale.address, uniswapFactory.address, { from: owner })
+    }
+
     const testContribute = (activate) => {
       let cpa
       const activateData = activate ? '0x01' : '0x'
       const activateDescription = activate ? ' and activates' : ''
 
-      beforeEach('Deploy airdrop contract', async () => {
+      beforeEach('Deploy contract', async () => {
         // deploy
-        cpa = await CourtPresaleActivate.new(owner, bondedToken.address, registry.address, presale.address, uniswapFactory.address, { from: owner })
+        cpa = await getCourtPresaleActivate()
       })
 
       const checkFinalBalances = async (amount, activate, initialActiveAmount, initialUserBalance) => {
@@ -240,13 +248,15 @@ contract('Court presale and activate wrapper', ([_, owner, provider, juror1, oth
       context('Doesn\'t activate tokens', () => {
         testContribute(false)
       })
+
+      refundable(getCourtPresaleActivate, { accounts, artifacts, web3 })
     })
   })
 
   context('Bad tokens', () => {
     let cpa, badCollateralToken, badExternalToken
 
-    beforeEach('Deploy airdrop contract', async () => {
+    beforeEach('Deploy contracts', async () => {
       // deploy bad tokens
       badCollateralToken = await ERC20Bad.new('Collateral Bad Token', 'CBT', 18)
       await badCollateralToken.mint(juror1, INITIAL_BIG_TOKEN_AMOUNT)
@@ -297,7 +307,7 @@ contract('Court presale and activate wrapper', ([_, owner, provider, juror1, oth
   context('Without Uniswap exchange', () => {
     let cpa
 
-    beforeEach('Deploy airdrop contract', async () => {
+    beforeEach('Deploy contracts', async () => {
       const uniswapFactory = await UniswapFactory.new()
       const { collateralToken, registry, presale } = await deploy({ owner, exchangeRate, uniswapFactory })
 
