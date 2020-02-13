@@ -34,7 +34,6 @@ const deployRegistry = async (owner) => {
 }
 
 const deployPresale = async (owner, collateralToken, bondedToken, exchangeRate) => {
-
   const presale = await Presale.new(collateralToken.address, bondedToken.address, exchangeRate)
   return { presale }
 }
@@ -67,5 +66,8 @@ const deploy = async ({
 }
 
 module.exports = {
-  deploy
+  deploy,
+  deployPresale,
+  deployRegistry,
+  deployUniswap
 }
